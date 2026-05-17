@@ -4,9 +4,9 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Ordering.Infrastructure.Persistence;
 using BuildingBlocks.Messaging;
-using IntegrationTests.Infrastructure;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Xunit;
@@ -46,10 +46,11 @@ public sealed class OutboxDispatcherResilienceTests : IAsyncLifetime
 
                 builder.ConfigureTestServices(services =>
                 {
-                    services.AddSingleton<MassTransitOutboxPublisher>();
-                    services.AddSingleton<TestFlakyOutboxPublisher>(sp =>
+                    services.RemoveAll<IOutboxPublisher>();
+                    services.AddScoped<MassTransitOutboxPublisher>();
+                    services.AddScoped<TestFlakyOutboxPublisher>(sp =>
                         new TestFlakyOutboxPublisher(sp.GetRequiredService<MassTransitOutboxPublisher>()));
-                    services.AddSingleton<IOutboxPublisher>(sp => sp.GetRequiredService<TestFlakyOutboxPublisher>());
+                    services.AddScoped<IOutboxPublisher>(sp => sp.GetRequiredService<TestFlakyOutboxPublisher>());
                 });
                 IntegrationTestAuthHelper.ApplyJwtSettings(builder);
             });

@@ -18,7 +18,7 @@ public static class MassTransitExtensions
         services.Configure<OutboxOptions>(configuration.GetSection(OutboxOptions.SectionName));
 
         services.AddSingleton<IConsumerExecutionFaultHook, NoOpConsumerExecutionFaultHook>();
-        services.AddSingleton<IOutboxPublisher, MassTransitOutboxPublisher>();
+        services.AddScoped<IOutboxPublisher, MassTransitOutboxPublisher>();
         services.AddSingleton<IntegrationEventUnitOfWorkExecutor>();
         services.AddSingleton<IntegrationEventConsumeObserver>();
 
