@@ -1,0 +1,274 @@
+name: microservices-ecommerce
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ecommerce-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ecommerce-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  seq:
+    image: datalust/seq:latest
+    container_name: ecommerce-seq
+    environment:
+      ACCEPT_EULA: "Y"
+    ports:
+      - "5341:80"
+    volumes:
+      - seq_data:/data
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: ecommerce-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - ordering-api
+      - catalog-api
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: ecommerce-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
+  identity-api:
+    build:
+      context: .
+      dockerfile: src/Services/Identity/Identity.Api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__IdentityDb: Host=postgres;Port=5432;Database=identity_db;Username=postgres;Password=postgres
+      Jwt__Secret: docker-demo-jwt-secret-key-min-32-chars!!
+      Jwt__Issuer: Microservices.Ecommerce
+      Jwt__Audience: Microservices.Ecommerce
+      Jwt__ExpirationMinutes: 120
+    ports:
+      - "5005:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 35s
+
+  catalog-api:
+    build:
+      context: .
+      dockerfile: src/Services/Catalog/Catalog.Api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__CatalogDb: Host=postgres;Port=5432;Database=catalog_db;Username=postgres;Password=postgres
+      Jwt__Secret: docker-demo-jwt-secret-key-min-32-chars!!
+      Jwt__Issuer: Microservices.Ecommerce
+      Jwt__Audience: Microservices.Ecommerce
+    ports:
+      - "5001:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  basket-api:
+    build:
+      context: .
+      dockerfile: src/Services/Basket/Basket.Api/Dockerfile
+    depends_on:
+      redis:
+        condition: service_healthy
+      ordering-api:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__Redis: redis:6379
+      Services__Ordering: http://ordering-api:8080
+      Jwt__Secret: docker-demo-jwt-secret-key-min-32-chars!!
+      Jwt__Issuer: Microservices.Ecommerce
+      Jwt__Audience: Microservices.Ecommerce
+    ports:
+      - "5002:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  ordering-api:
+    build:
+      context: .
+      dockerfile: src/Services/Ordering/Ordering.Api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__OrderingDb: Host=postgres;Port=5432;Database=ordering_db;Username=postgres;Password=postgres
+      RabbitMq__Host: rabbitmq
+      Jwt__Secret: docker-demo-jwt-secret-key-min-32-chars!!
+      Jwt__Issuer: Microservices.Ecommerce
+      Jwt__Audience: Microservices.Ecommerce
+    ports:
+      - "5003:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  inventory-api:
+    build:
+      context: .
+      dockerfile: src/Services/Inventory/Inventory.Api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__InventoryDb: Host=postgres;Port=5432;Database=inventory_db;Username=postgres;Password=postgres
+      RabbitMq__Host: rabbitmq
+    ports:
+      - "5004:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  payment-worker:
+    build:
+      context: .
+      dockerfile: src/Services/Payment/Payment.Worker/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__PaymentDb: Host=postgres;Port=5432;Database=payment_db;Username=postgres;Password=postgres
+      RabbitMq__Host: rabbitmq
+    ports:
+      - "5010:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  notification-worker:
+    build:
+      context: .
+      dockerfile: src/Services/Notification/Notification.Worker/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__NotificationDb: Host=postgres;Port=5432;Database=notification_db;Username=postgres;Password=postgres
+      RabbitMq__Host: rabbitmq
+    ports:
+      - "5011:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: src/ApiGateway/Dockerfile
+    depends_on:
+      identity-api:
+        condition: service_healthy
+      catalog-api:
+        condition: service_healthy
+      basket-api:
+        condition: service_healthy
+      ordering-api:
+        condition: service_healthy
+      inventory-api:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      Jwt__Secret: docker-demo-jwt-secret-key-min-32-chars!!
+      Jwt__Issuer: Microservices.Ecommerce
+      Jwt__Audience: Microservices.Ecommerce
+    ports:
+      - "5000:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+
+volumes:
+  postgres_data:
+  seq_data:

@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Microservices.Ecommerce.sln
+
+      - name: Build
+        run: dotnet build Microservices.Ecommerce.sln --no-restore -c Release
+
+      - name: Unit tests
+        run: |
+          dotnet test tests/Catalog.UnitTests/Catalog.UnitTests.csproj --no-build -c Release --verbosity normal
+          dotnet test tests/Basket.UnitTests/Basket.UnitTests.csproj --no-build -c Release --verbosity normal
+          dotnet test tests/Ordering.UnitTests/Ordering.UnitTests.csproj --no-build -c Release --verbosity normal
+
+  integration:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore Microservices.Ecommerce.sln
+
+      - name: Build
+        run: dotnet build Microservices.Ecommerce.sln --no-restore -c Release
+
+      - name: Integration & security tests (Testcontainers)
+        run: |
+          dotnet test tests/IntegrationTests/IntegrationTests.csproj --no-build -c Release --verbosity normal
+          dotnet test tests/Security.IntegrationTests/Security.IntegrationTests.csproj --no-build -c Release --verbosity normal

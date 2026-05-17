@@ -1,0 +1,38 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+.idea/
+*.DotSettings.user
+
+## Test & coverage
+TestResults/
+coverage/
+*.trx
+*.coverage
+*.coveragexml
+
+## Docker & secrets
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+secrets.json
+
+## Logs
+logs/
+*.log
+
+## OS
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+## Tools
+_ReSharper*/
+*.swp
+*~

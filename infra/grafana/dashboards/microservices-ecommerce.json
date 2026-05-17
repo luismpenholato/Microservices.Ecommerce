@@ -1,0 +1,76 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Orders created (rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(ecommerce_orders_created_total[1m]))",
+          "legendFormat": "created/s"
+        }
+      ]
+    },
+    {
+      "title": "Orders completed / failed / cancelled",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "sum(rate(ecommerce_orders_completed_total[1m]))", "legendFormat": "completed/s" },
+        { "expr": "sum(rate(ecommerce_orders_failed_total[1m]))", "legendFormat": "failed/s" },
+        { "expr": "sum(rate(ecommerce_orders_cancelled_total[1m]))", "legendFormat": "cancelled/s" }
+      ]
+    },
+    {
+      "title": "Outbox pending",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum by (service) (ecommerce_outbox_messages_pending)",
+          "legendFormat": "{{service}}"
+        }
+      ]
+    },
+    {
+      "title": "Outbox publish failures / exhausted",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "sum(rate(ecommerce_outbox_messages_publish_failures_total[1m]))", "legendFormat": "failures/s" },
+        { "expr": "sum(rate(ecommerce_outbox_messages_exhausted_total[1m]))", "legendFormat": "exhausted/s" }
+      ]
+    },
+    {
+      "title": "Consumer processed / failed",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "sum by (service, consumer_name) (rate(ecommerce_consumer_messages_processed_total[1m]))", "legendFormat": "{{service}} {{consumer_name}} ok" },
+        { "expr": "sum by (service, consumer_name) (rate(ecommerce_consumer_messages_failed_total[1m]))", "legendFormat": "{{service}} {{consumer_name}} fail" }
+      ]
+    },
+    {
+      "title": "Stock reservations approved / failed",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "targets": [
+        { "expr": "sum(rate(ecommerce_stock_reservations_approved_total[1m]))", "legendFormat": "approved/s" },
+        { "expr": "sum(rate(ecommerce_stock_reservations_failed_total[1m]))", "legendFormat": "failed/s" }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["ecommerce", "microservices"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "title": "Microservices.Ecommerce",
+  "uid": "microservices-ecommerce",
+  "version": 1
+}

@@ -1,0 +1,34 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: catalog-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["catalog-api:8080"]
+
+  - job_name: basket-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["basket-api:8080"]
+
+  - job_name: ordering-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["ordering-api:8080"]
+
+  - job_name: inventory-api
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["inventory-api:8080"]
+
+  - job_name: payment-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["payment-worker:8080"]
+
+  - job_name: notification-worker
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["notification-worker:8080"]

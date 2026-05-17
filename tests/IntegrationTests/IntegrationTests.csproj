@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Services\Basket\Basket.Api\Basket.Api.csproj" />
+    <ProjectReference Include="..\..\src\Services\Ordering\Ordering.Api\Ordering.Api.csproj" />
+    <ProjectReference Include="..\..\src\Services\Ordering\Ordering.Infrastructure\Ordering.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Services\Inventory\Inventory.Api\Inventory.Api.csproj" />
+    <ProjectReference Include="..\..\src\BuildingBlocks\BuildingBlocks.Messaging\BuildingBlocks.Messaging.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Testcontainers" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
+    <PackageReference Include="Testcontainers.RabbitMq" />
+    <PackageReference Include="Testcontainers.Redis" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+</Project>

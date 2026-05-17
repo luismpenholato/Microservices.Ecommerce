@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+.github
+
+# IDE
+.vs
+.idea
+*.user
+*.suo
+*.DotSettings.user
+
+# Build artifacts
+**/bin
+**/obj
+**/out
+**/TestResults
+**/coverage
+
+# Docs & scripts (not needed in image build context)
+docs
+scripts
+*.md
+!src/**/README.md
+
+# Tests
+tests
+
+# Local secrets
+.env
+.env.*
+**/*.local.json
+secrets.json
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Docker compose (not part of service images)
+docker-compose*.yml
+docker-compose*.yaml
