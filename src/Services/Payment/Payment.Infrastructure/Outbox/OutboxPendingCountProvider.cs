@@ -1,7 +1,6 @@
 using BuildingBlocks.Messaging;
 using BuildingBlocks.Messaging.Metrics;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Payment.Infrastructure.Persistence;

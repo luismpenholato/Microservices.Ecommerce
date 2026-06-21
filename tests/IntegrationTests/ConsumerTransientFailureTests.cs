@@ -11,7 +11,6 @@ using Ordering.Domain.Enums;
 using Ordering.Infrastructure.Messaging.Consumers;
 using Ordering.Infrastructure.Persistence;
 using BuildingBlocks.Messaging;
-using IntegrationTests.Infrastructure;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Xunit;

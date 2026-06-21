@@ -1,6 +1,6 @@
 # Microservices.Ecommerce
 
-[![CI](https://github.com/luismpenholato/Microservices.Ecommerce/actions/workflows/ci.yml/badge.svg)](https://github.com/luismpenholato/Microservices.Ecommerce/actions/workflows/ci.yml)
+[![CI](https://github.com/luismpenholato/Microservices.Ecommerce/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/luismpenholato/Microservices.Ecommerce/actions/workflows/ci.yml)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 

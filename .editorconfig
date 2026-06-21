@@ -39,5 +39,9 @@ indent_size = 2
 [*.md]
 trim_trailing_whitespace = false
 
+[src/**/Persistence/Migrations/**.cs]
+csharp_style_namespace_declarations = block_scoped:silent
+dotnet_diagnostic.IDE0161.severity = none
+
 [*.{ps1,sh}]
 indent_size = 4
