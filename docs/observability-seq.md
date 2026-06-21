@@ -1,93 +1,93 @@
-# Rastreamento de pedidos no Seq
+# Order tracing in Seq
 
-## Pré-requisitos
+## Prerequisites
 
-- `docker compose up` com o serviço **Seq** (`http://localhost:5341`).
-- Serviços configurados com Serilog (APIs via `AddObservability`, workers via `AddWorkerObservability`).
+- `docker compose up` with the **Seq** service (`http://localhost:5341`).
+- Services configured with Serilog (APIs via `AddObservability`, workers via `AddWorkerObservability`).
 
-## Propriedades estruturadas principais
+## Main structured properties
 
-| Propriedade | Origem | Uso |
-|-------------|--------|-----|
-| `Service` | Enricher global | Filtrar por microserviço |
-| `CorrelationId` | Header `X-Correlation-Id` / eventos | Rastrear fluxo ponta a ponta |
-| `OrderId` | Handlers e eventos com pedido | Foco no pedido |
-| `EventId` | `IntegrationEvent` | Idempotência / reprocessamento |
-| `ConsumerName` | Consumer MassTransit | Qual handler processou |
-| `MessageType` | Tipo do evento | Ex.: `PaymentApprovedEvent` |
-| `OutboxId` | OutboxDispatcher | Publicação pendente/falha |
+| Property | Source | Use |
+|----------|--------|-----|
+| `Service` | Global enricher | Filter by microservice |
+| `CorrelationId` | Header `X-Correlation-Id` / events | End-to-end flow tracing |
+| `OrderId` | Handlers and events with order | Focus on the order |
+| `EventId` | `IntegrationEvent` | Idempotency / reprocessing |
+| `ConsumerName` | MassTransit consumer | Which handler processed |
+| `MessageType` | Event type | e.g. `PaymentApprovedEvent` |
+| `OutboxId` | OutboxDispatcher | Pending/failed publication |
 
-## Consultas úteis no Seq
+## Useful Seq queries
 
-### 1. Seguir um pedido pelo `OrderId`
+### 1. Follow an order by `OrderId`
 
 ```sql
 OrderId = 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
 ```
 
-Ordene por `@Timestamp` ascendente para ver a linha do tempo.
+Sort by `@Timestamp` ascending to see the timeline.
 
-### 2. Seguir o fluxo distribuído pelo `CorrelationId`
+### 2. Follow the distributed flow by `CorrelationId`
 
 ```sql
 CorrelationId = 'yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy'
 ```
 
-Inclui checkout HTTP, consumers e outbox do mesmo fluxo.
+Includes HTTP checkout, consumers, and outbox for the same flow.
 
-### 3. Investigar falha de consumer (antes da error queue)
+### 3. Investigate consumer failure (before error queue)
 
 ```sql
 @Level = 'Error' and ConsumerName is not null
 ```
 
-Ou:
+Or:
 
 ```sql
 @Message like '%Consume fault%'
 ```
 
-Campos esperados: `MessageType`, `ConsumerName`, `EventId`, `CorrelationId`, `OrderId`.
+Expected fields: `MessageType`, `ConsumerName`, `EventId`, `CorrelationId`, `OrderId`.
 
-### 4. Outbox pendente ou com falha de publicação
+### 4. Pending outbox or publish failure
 
 ```sql
 Service = 'OrderingService' and (@Message like '%outbox publish failed%' or @Message like '%outbox publish exhausted%')
 ```
 
-Verifique `OutboxId`, `EventId`, `RetryCount` no texto ou propriedades.
+Check `OutboxId`, `EventId`, `RetryCount` in text or properties.
 
-### 5. Evento já processado (idempotência)
+### 5. Already processed event (idempotency)
 
 ```sql
 @Message like '%already processed%' and ConsumerName is not null
 ```
 
-Indica reentrega ignorada com segurança.
+Indicates safe redelivery was ignored.
 
-## Fluxo típico de logs (pedido feliz)
+## Typical log flow (happy path order)
 
-1. **BasketService** — checkout com `CorrelationId`.
-2. **OrderingService** — pedido criado + outbox `OrderCreatedEvent` publicado.
-3. **Payment.Worker** — pagamento aprovado/rejeitado (outbox).
-4. **OrderingService** — consumer `PaymentApprovedConsumer` (transição de status).
-5. **InventoryService** — reserva de estoque (outbox `StockReservedEvent`).
+1. **BasketService** — checkout with `CorrelationId`.
+2. **OrderingService** — order created + outbox `OrderCreatedEvent` published.
+3. **Payment.Worker** — payment approved/rejected (outbox).
+4. **OrderingService** — consumer `PaymentApprovedConsumer` (status transition).
+5. **InventoryService** — stock reservation (outbox `StockReservedEvent`).
 6. **OrderingService** — `StockReservedConsumer` → `Completed` + outbox `OrderCompletedEvent`.
-7. **Notification.Worker** — notificação simulada.
+7. **Notification.Worker** — simulated notification.
 
-## O que não aparece no Seq
+## What does not appear in Seq
 
-- Mensagens na fila `{endpoint}_error` do RabbitMQ (inspecionar no Management UI: `http://localhost:15672`).
-- Replay manual de error queue (operação fora da aplicação).
+- Messages in RabbitMQ `{endpoint}_error` queue (inspect in Management UI: `http://localhost:15672`).
+- Manual error queue replay (operation outside the application).
 
-## Métricas (Prometheus)
+## Metrics (Prometheus)
 
-Correlacione picos em Seq com dashboards Grafana — ver [observability-prometheus.md](./observability-prometheus.md).
+Correlate spikes in Seq with Grafana dashboards — see [observability-prometheus.md](./observability-prometheus.md).
 
-## Boas práticas
+## Best practices
 
-- Propague `X-Correlation-Id` em chamadas HTTP de teste e Postman.
-- Use `OrderId` após o checkout para correlacionar com eventos.
-- Falhas técnicas de consumer: log `Consume fault` (nível Error) + métrica `ecommerce_consumer_messages_failed_total`.
-- Transições de negócio: nível Information nos handlers Application.
-- Não use `EventId`/`OrderId` como labels de métricas (alta cardinalidade).
+- Propagate `X-Correlation-Id` in HTTP test calls and Postman.
+- Use `OrderId` after checkout to correlate with events.
+- Consumer technical failures: `Consume fault` log (Error level) + `ecommerce_consumer_messages_failed_total` metric.
+- Business transitions: Information level in Application handlers.
+- Do not use `EventId`/`OrderId` as metric labels (high cardinality).

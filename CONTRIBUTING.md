@@ -1,50 +1,51 @@
-# Contribuindo
+# Contributing
 
-Obrigado pelo interesse em contribuir com o **Microservices.Ecommerce**.
+Thank you for your interest in contributing to **Microservices.Ecommerce**.
 
-## Antes de abrir um PR
+## Before opening a PR
 
-1. Abra uma issue descrevendo a mudança (bug, doc, melhoria).
-2. Faça fork e crie uma branch a partir de `main`.
-3. Mantenha o escopo focado — evite refactors amplos misturados com feature.
+1. Open an issue describing the change (bug, documentation, improvement).
+2. Fork the repository and create a branch from `main`.
+3. Keep the scope focused — avoid mixing broad refactors with feature work.
 
-## Ambiente local
+## Local environment
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (testes de integração e `validate-local`)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (integration tests and local Docker Compose)
 
 ```bash
-dotnet restore
-dotnet build
+dotnet restore Microservices.Ecommerce.sln
+dotnet build Microservices.Ecommerce.sln -c Release
 dotnet test
 docker compose up -d --build
-./scripts/validate-local.sh --run-checkout-flow   # Linux/macOS/WSL
 ```
 
-## Padrões de código
+Manual stack validation: [docs/smoke-tests.md](docs/smoke-tests.md).
 
-- Siga o [.editorconfig](.editorconfig).
-- Clean Architecture por serviço: regra de negócio em **Application/Domain**, não em controllers ou consumers.
-- Não commitar segredos (`.env`, chaves JWT de produção).
-- `TreatWarningsAsErrors` permanece **desligado** na solução; corrija warnings relevantes no código que você alterar.
+## Code standards
 
-## Testes
+- Follow [.editorconfig](.editorconfig).
+- Clean Architecture per service: business rules in **Application/Domain**, not in controllers or consumers.
+- Do not commit secrets (`.env`, production JWT keys).
+- `TreatWarningsAsErrors` is **disabled** solution-wide; fix warnings relevant to code you change.
 
-| Tipo | Projeto | Docker |
+## Tests
+
+| Type | Project | Docker |
 |------|---------|--------|
-| Unitário | `*UnitTests` | Não |
-| Integração | `IntegrationTests` | Sim |
-| Segurança | `Security.IntegrationTests` | Sim |
+| Unit | `*UnitTests` | No |
+| Integration | `IntegrationTests` | Yes |
+| Security | `Security.IntegrationTests` | Yes |
 
-Inclua ou atualize testes quando alterar comportamento observável.
+Include or update tests when changing observable behavior.
 
 ## Commits
 
-Prefira mensagens claras em português ou inglês, no imperativo:
+Prefer clear messages in English, imperative mood:
 
-- `fix: corrige validação de customerId no Basket`
-- `docs: atualiza guia de smoke tests`
+- `fix: validate customerId ownership in Basket checkout`
+- `docs: update smoke test guide`
 
 ## Pull requests
 
-Use o template de PR. Descreva o que mudou, como testou e se há impacto em runbooks ou scripts `validate-local`.
+Use the PR template. Describe what changed, how you tested, and whether runbooks or documentation are affected.

@@ -1,13 +1,13 @@
-# ADR 0004: RabbitMQ para eventos de negócio
+# ADR 0004: RabbitMQ for business events
 
 ## Status
 
-Aceito
+Accepted
 
-## Decisão
+## Decision
 
-MassTransit + RabbitMQ com retry configurável (`MessageBusOptions`), error queues `{endpoint}_error` e consumidores idempotentes. Ver também [ADR 0008](./0008-retry-dlq-error-queues.md).
+MassTransit + RabbitMQ with configurable retry (`MessageBusOptions`), error queues `{endpoint}_error`, and idempotent consumers. See also [ADR 0008](./0008-retry-dlq-error-queues.md).
 
-## Motivo
+## Rationale
 
-Maturidade, simplicidade local via Docker e adequação a workflows de pedido.
+Maturity, local simplicity via Docker, and fit for order workflows.

@@ -1,96 +1,96 @@
-# Arquitetura — Microservices.Ecommerce
+# Architecture — Microservices.Ecommerce
 
-Documentação relacionada: [service-communication.md](./service-communication.md) · [security.md](./security.md) · [testing.md](./testing.md) · [operations.md](./operations.md) · [ADRs](./decisions/)
+Related documentation: [service-communication.md](./service-communication.md) · [security.md](./security.md) · [testing.md](./testing.md) · [operations.md](./operations.md) · [ADRs](./decisions/)
 
-## Visão geral
+## Overview
 
-E-commerce distribuído em **.NET 10** com padrões próximos de produção local:
+Distributed e-commerce built with **.NET 10** using patterns close to local production:
 
-- **Database per Service** (PostgreSQL isolado por serviço com estado)
-- **Transactional Outbox** para publicação confiável de eventos
-- **Idempotency-Key** no checkout (Basket → Ordering)
-- **Consumers transacionalmente idempotentes** (`EventId` + `ConsumerName`, índice único composto)
-- **RabbitMQ + MassTransit** para processos assíncronos
-- **API Gateway** (YARP) como entrada HTTP única
-- **Clean Architecture** em cada serviço (regra de negócio em Application/Domain, não em Controller/Consumer)
+- **Database per Service** (isolated PostgreSQL per stateful service)
+- **Transactional Outbox** for reliable event publishing
+- **Idempotency-Key** on checkout (Basket → Ordering)
+- **Transactionally idempotent consumers** (`EventId` + `ConsumerName`, composite unique index)
+- **RabbitMQ + MassTransit** for asynchronous processes
+- **API Gateway** (YARP) as the single HTTP entry point
+- **Clean Architecture** in each service (business rules in Application/Domain, not in Controller/Consumer)
 
-## Serviços e responsabilidades
+## Services and responsibilities
 
-| Serviço | Tipo | Responsabilidade | Persistência |
-|---------|------|------------------|--------------|
-| **ApiGateway** | API | Roteamento HTTP (YARP) + JWT na borda | — |
+| Service | Type | Responsibility | Persistence |
+|---------|------|----------------|-------------|
+| **ApiGateway** | API | HTTP routing (YARP) + JWT at the edge | — |
 | **IdentityService** | API | Register/Login JWT | PostgreSQL `identity_db` |
-| **CatalogService** | API | Catálogo de produtos | PostgreSQL `catalog_db` |
-| **BasketService** | API | Carrinho temporário + checkout HTTP | Redis |
-| **OrderingService** | API | Ciclo de vida do pedido | PostgreSQL `ordering_db` + outbox |
-| **Payment.Worker** | Worker | Simulação de pagamento | PostgreSQL `payment_db` + outbox |
-| **InventoryService** | API | Estoque e reserva | PostgreSQL `inventory_db` + outbox |
-| **Notification.Worker** | Worker | Notificações simuladas | PostgreSQL `notification_db` |
+| **CatalogService** | API | Product catalog | PostgreSQL `catalog_db` |
+| **BasketService** | API | Temporary cart + HTTP checkout | Redis |
+| **OrderingService** | API | Order lifecycle | PostgreSQL `ordering_db` + outbox |
+| **Payment.Worker** | Worker | Payment simulation | PostgreSQL `payment_db` + outbox |
+| **InventoryService** | API | Stock and reservation | PostgreSQL `inventory_db` + outbox |
+| **Notification.Worker** | Worker | Simulated notifications | PostgreSQL `notification_db` |
 
-## Padrões críticos
+## Critical patterns
 
 ### Transactional Outbox
 
-Pedido/evento de integração e registro na tabela `outbox_messages` são gravados na **mesma transação**. Um `BackgroundService` (`OutboxDispatcher`) publica no RabbitMQ, incrementa `RetryCount` em falha e define `ProcessedAtUtc` somente após publicação bem-sucedida. Índice único em `EventId` reduz duplicidade na fila.
+The order/integration event and the record in the `outbox_messages` table are written in the **same transaction**. A `BackgroundService` (`OutboxDispatcher`) publishes to RabbitMQ, increments `RetryCount` on failure, and sets `ProcessedAtUtc` only after successful publication. A unique index on `EventId` reduces duplication in the queue.
 
-Ver [ADR 0006](./decisions/0006-transactional-outbox.md).
+See [ADR 0006](./decisions/0006-transactional-outbox.md).
 
 ### Idempotency-Key (checkout)
 
-O Basket envia o header `Idempotency-Key` (derivado de `customerId` + hash do carrinho). O Ordering persiste em `order_idempotency_records`:
+Basket sends the `Idempotency-Key` header (derived from `customerId` + cart hash). Ordering persists it in `order_idempotency_records`:
 
-- Mesma chave + mesmo payload → retorna o mesmo `OrderId` (200/201)
-- Mesma chave + payload diferente → **409 Conflict**
+- Same key + same payload → returns the same `OrderId` (200/201)
+- Same key + different payload → **409 Conflict**
 
-Ver [ADR 0007](./decisions/0007-idempotency-key.md).
+See [ADR 0007](./decisions/0007-idempotency-key.md).
 
-### Idempotência transacional de consumers
+### Transactional consumer idempotency
 
-Cada consumer herda `TransactionalIdempotentConsumer<TEvent>` e executa via `IIntegrationEventUnitOfWork`:
+Each consumer inherits `TransactionalIdempotentConsumer<TEvent>` and executes via `IIntegrationEventUnitOfWork`:
 
-1. Inicia transação
-2. Se `(EventId, ConsumerName)` já existe → ignora com log estruturado
-3. Executa handler (Application)
-4. Grava `processed_integration_events` na mesma transação
+1. Starts a transaction
+2. If `(EventId, ConsumerName)` already exists → skips with structured log
+3. Runs handler (Application)
+4. Writes `processed_integration_events` in the same transaction
 5. Commit
 
-Em caso de exceção no handler, a transação é revertida e o evento **não** é marcado como processado (MassTransit reentrega).
+If the handler throws, the transaction is rolled back and the event is **not** marked as processed (MassTransit redelivers).
 
-PK composta `(EventId, ConsumerName)` evita race condition entre instâncias.
+Composite PK `(EventId, ConsumerName)` prevents race conditions between instances.
 
-### Retry e error queues (camadas separadas)
+### Retry and error queues (separate layers)
 
-| Camada | Configuração | Comportamento |
-|--------|--------------|---------------|
-| **Consumer** | `MessageBusOptions` | `UseMessageRetry` no MassTransit; falha não grava `processed_integration_events` |
-| **Outbox** | `OutboxOptions` | `OutboxDispatcher` incrementa `RetryCount`; sucesso → `ProcessedAtUtc` |
+| Layer | Configuration | Behavior |
+|-------|---------------|----------|
+| **Consumer** | `MessageBusOptions` | `UseMessageRetry` in MassTransit; failure does not write `processed_integration_events` |
+| **Outbox** | `OutboxOptions` | `OutboxDispatcher` increments `RetryCount`; success → `ProcessedAtUtc` |
 
-Após esgotar retry do consumer, mensagem vai para **`{endpoint}_error`** no RabbitMQ. Não há compensação automática; replay é operação manual.
+After consumer retry is exhausted, the message goes to **`{endpoint}_error`** in RabbitMQ. There is no automatic compensation; replay is a manual operation.
 
-`IntegrationEventConsumeObserver` registra falhas técnicas (`MessageType`, `ConsumerName`, `EventId`, `CorrelationId`, `OrderId`). Handlers Application mantêm logs de negócio.
+`IntegrationEventConsumeObserver` logs technical failures (`MessageType`, `ConsumerName`, `EventId`, `CorrelationId`, `OrderId`). Application handlers keep business logs.
 
-`IConsumerExecutionFaultHook` (NoOp em produção) permite simular falha transitória em testes sem vazar lógica para Application.
+`IConsumerExecutionFaultHook` (NoOp in production) allows simulating transient failure in tests without leaking logic into Application.
 
-Ver [ADR 0008](./decisions/0008-retry-dlq-error-queues.md) e [observability-seq.md](./observability-seq.md).
+See [ADR 0008](./decisions/0008-retry-dlq-error-queues.md) and [observability-seq.md](./observability-seq.md).
 
-## Comunicação
+## Communication
 
-### Síncrona (HTTP)
+### Synchronous (HTTP)
 
-- Cliente → ApiGateway → Catalog / Basket / Ordering / Inventory / Identity
-- **Basket → Ordering** no checkout (retorno imediato do `orderId` + idempotência; Bearer repassado ao Ordering)
+- Client → ApiGateway → Catalog / Basket / Ordering / Inventory / Identity
+- **Basket → Ordering** on checkout (immediate `orderId` response + idempotency; Bearer forwarded to Ordering)
 
-### Segurança (JWT)
+### Security (JWT)
 
-- **IdentityService** emite JWT (BCrypt para senhas; segredo via `Jwt:Secret` / variáveis de ambiente).
-- **ApiGateway** valida JWT e aplica regras por rota (`GatewayAuthorizationMiddleware`).
-- **Basket/Ordering** validam JWT novamente (defesa em profundidade) e usam claim `customer_id`.
-- **Catalog**: GET público; POST/PUT exige role `Admin`.
-- **Inventory**: leitura/ajuste públicos no demo (justificativa: observabilidade de estoque sem fricção em portfólio; proteger em produção).
+- **IdentityService** issues JWT (BCrypt for passwords; secret via `Jwt:Secret` / environment variables).
+- **ApiGateway** validates JWT and applies per-route rules (`GatewayAuthorizationMiddleware`).
+- **Basket/Ordering** validate JWT again (defense in depth) and use the `customer_id` claim.
+- **Catalog**: GET is public; POST/PUT requires `Admin` role.
+- **Inventory**: public read/adjust in the demo (rationale: stock observability without friction in a portfolio project; protect in production).
 
 Claims: `sub`, `email`, `customer_id`, `role`.
 
-### Assíncrona (eventos)
+### Asynchronous (events)
 
 ```mermaid
 sequenceDiagram
@@ -108,8 +108,8 @@ sequenceDiagram
     Note over P: TX: Outbox PaymentApproved/Rejected
     P->>R: PaymentApprovedEvent
     R->>O: PaymentApproved (idempotent)
-    R->>I: PaymentApproved (reserva estoque)
-    Note over I: TX: estoque + Outbox
+    R->>I: PaymentApproved (stock reservation)
+    Note over I: TX: stock + Outbox
     I->>R: StockReservedEvent
     R->>O: StockReserved (idempotent)
     Note over O: TX: status + Outbox OrderCompleted
@@ -117,27 +117,27 @@ sequenceDiagram
     R->>N: notify (idempotent)
 ```
 
-| Evento | Publicado por | Consumido por |
-|--------|---------------|---------------|
+| Event | Published by | Consumed by |
+|-------|--------------|-------------|
 | `OrderCreatedEvent` | Ordering (outbox) | Payment.Worker |
 | `PaymentApprovedEvent` / `PaymentRejectedEvent` | Payment (outbox) | Ordering, Inventory |
 | `StockReservedEvent` / `StockReservationFailedEvent` | Inventory (outbox) | Ordering |
 | `OrderCompletedEvent` / `OrderCancelledEvent` | Ordering (outbox) | Notification.Worker |
 
-## Consistência eventual
+## Eventual consistency
 
-Cada serviço mantém estado próprio. Status em Ordering pode ficar temporariamente defasado em relação a Payment/Inventory — esperado. Outbox + idempotência de consumers garantem **at-least-once** sem efeitos colaterais duplicados na maioria dos casos.
+Each service maintains its own state. Status in Ordering may temporarily lag behind Payment/Inventory — this is expected. Outbox + consumer idempotency provide **at-least-once** delivery without duplicate side effects in most cases.
 
-## Observabilidade e operação
+## Observability and operations
 
-- Logs estruturados (Serilog → Seq): `OrderId`, `EventId`, `CorrelationId`, `ConsumerName`, `MessageType`
-- Health: `/health/live` (apenas processo), `/health/ready` (PostgreSQL, Redis, RabbitMQ conforme serviço)
-- Métricas `ecommerce_*` em `/metrics` (Prometheus + Grafana no compose)
-- Workers expõem `/health/live`, `/health/ready`, `/metrics` sem controllers
-- OpenTelemetry (OTLP opcional, Prometheus habilitado por padrão no Docker)
+- Structured logs (Serilog → Seq): `OrderId`, `EventId`, `CorrelationId`, `ConsumerName`, `MessageType`
+- Health: `/health/live` (process only), `/health/ready` (PostgreSQL, Redis, RabbitMQ per service)
+- `ecommerce_*` metrics at `/metrics` (Prometheus + Grafana in compose)
+- Workers expose `/health/live`, `/health/ready`, `/metrics` without controllers
+- OpenTelemetry (optional OTLP, Prometheus enabled by default in Docker)
 - Runbooks: [docs/runbooks/](./runbooks/) — [operations.md](./operations.md)
 
-## Diagrama de deploy (Docker Compose)
+## Deployment diagram (Docker Compose)
 
 ```mermaid
 flowchart TB
@@ -174,16 +174,16 @@ flowchart TB
     Not --> RMQ
 ```
 
-## Testes
+## Tests
 
-Detalhes em [testing.md](./testing.md).
+Details in [testing.md](./testing.md).
 
-## Decisões
+## Decisions
 
-ADRs em [decisions/](./decisions/), em especial:
+ADRs in [decisions/](./decisions/), especially:
 
 - [0006 — Transactional Outbox](./decisions/0006-transactional-outbox.md)
 - [0007 — Idempotency-Key](./decisions/0007-idempotency-key.md)
 - [0008 — Retry / error queues](./decisions/0008-retry-dlq-error-queues.md)
 
-Veja também [service-communication.md](./service-communication.md).
+See also [service-communication.md](./service-communication.md).

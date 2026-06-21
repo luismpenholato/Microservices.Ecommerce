@@ -4,19 +4,13 @@
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-E-commerce distribuído em **.NET 10** para demonstrar microserviços com **Clean Architecture**, mensageria, consistência eventual, JWT, outbox transacional e observabilidade — pronto para clonar, validar e apresentar em portfólio.
+Production-like e-commerce microservices platform built with .NET 10, ASP.NET Core, YARP API Gateway, RabbitMQ, MassTransit, PostgreSQL, Redis, JWT authentication, Transactional Outbox, idempotent consumers, Docker Compose, and structured observability.
 
-## Visão geral
+## Purpose
 
-| Área | Tecnologias |
-|------|-------------|
-| APIs | ASP.NET Core, YARP (Gateway) |
-| Mensageria | RabbitMQ, MassTransit |
-| Dados | PostgreSQL (database per service), Redis (carrinho) |
-| Auth | JWT, BCrypt, IdentityService dedicado |
-| Ops | Serilog/Seq, Prometheus, Grafana, health checks, runbooks |
+This repository is a **portfolio / open-source reference project**. It demonstrates distributed e-commerce patterns with production-like characteristics — not a turnkey commercial platform. Clone it, run it locally with Docker Compose, explore the code, and use it to showcase microservices architecture in interviews and GitHub profiles.
 
-## Arquitetura
+## Architecture overview
 
 ```mermaid
 flowchart TB
@@ -56,13 +50,100 @@ flowchart TB
     Ord -.-> Seq
 ```
 
-Fluxo assíncrono do pedido (resumo): checkout → `OrderCreatedEvent` → pagamento → reserva de estoque → `OrderCompletedEvent` → notificação.
+Full technical documentation: [docs/architecture.md](docs/architecture.md)
 
-Documentação completa: [docs/architecture.md](docs/architecture.md)
+## Services
 
-## Quick Start
+| Service | Type | Responsibility | Persistence |
+|---------|------|----------------|-------------|
+| **ApiGateway** | API | YARP reverse proxy, JWT at the edge | — |
+| **IdentityService** | API | Register / login / JWT issuance | PostgreSQL `identity_db` |
+| **CatalogService** | API | Product catalog | PostgreSQL `catalog_db` |
+| **BasketService** | API | Shopping cart + HTTP checkout | Redis |
+| **OrderingService** | API | Order lifecycle + integration events | PostgreSQL `ordering_db` + outbox |
+| **Payment.Worker** | Worker | Simulated payment processing | PostgreSQL `payment_db` + outbox |
+| **InventoryService** | API | Stock and reservation | PostgreSQL `inventory_db` + outbox |
+| **Notification.Worker** | Worker | Simulated notifications | PostgreSQL `notification_db` |
 
-**Pré-requisitos:** Docker Desktop (ou Docker Engine + Compose v2), .NET 10 SDK (opcional para build local).
+## Runtime architecture
+
+- **ApiGateway** (`http://localhost:5000`) is the single external HTTP entry point.
+- **IdentityService** issues JWTs consumed by the gateway and downstream services.
+- **PostgreSQL** — one database per stateful service (`identity_db`, `catalog_db`, `ordering_db`, `inventory_db`, `payment_db`, `notification_db`).
+- **Redis** — ephemeral basket state.
+- **RabbitMQ + MassTransit** — async integration between Ordering, Payment, Inventory, and Notification.
+- **Seq, Prometheus, Grafana** — local observability stack.
+
+## Business flow
+
+1. Customer browses the public catalog.
+2. Customer authenticates via Identity and receives a JWT.
+3. Customer adds items to the basket (Redis).
+4. Checkout creates an order in Ordering (HTTP + `Idempotency-Key`).
+5. Ordering publishes `OrderCreatedEvent` via the transactional outbox.
+6. Payment.Worker approves or rejects payment.
+7. InventoryService reserves stock.
+8. Ordering completes the order and publishes `OrderCompletedEvent`.
+9. Notification.Worker logs a simulated notification.
+
+## Checkout flow
+
+1. `POST /identity/auth/login` → `accessToken` + `customerId`
+2. `GET /catalog/products` (public)
+3. `POST /basket/baskets/{customerId}/items` with `Authorization: Bearer`
+4. `POST /basket/baskets/{customerId}/checkout`
+5. Poll `GET /ordering/orders/{orderId}` until status is `Completed`
+
+Detailed walkthrough: [docs/smoke-tests.md](docs/smoke-tests.md) · curl examples: [docs/examples/http-requests.md](docs/examples/http-requests.md)
+
+## Messaging and consistency
+
+| Pattern | Where |
+|---------|-------|
+| Transactional Outbox | Ordering, Payment, Inventory |
+| Idempotency-Key | Basket → Ordering checkout |
+| Idempotent consumers | `(EventId, ConsumerName)` in the same DB transaction |
+| Retry + `_error` queues | MassTransit — manual replay |
+
+ADRs: [docs/decisions/](docs/decisions/) · Communication details: [docs/service-communication.md](docs/service-communication.md)
+
+## Authentication and authorization
+
+- **IdentityService** — register, login, `/me`
+- JWT claims: `sub`, `email`, `customer_id`, `role`
+- **Gateway** — basket and ordering routes require JWT; catalog GET is public; catalog write requires Admin
+- Basket and Ordering validate URL `customerId` against the token
+
+Details: [docs/security.md](docs/security.md)
+
+## Observability
+
+| Signal | Tool | Endpoint |
+|--------|------|----------|
+| Logs | Serilog → Seq | http://localhost:5341 |
+| Metrics | Prometheus + Grafana | `/metrics` on each service; Grafana http://localhost:3000 |
+| Health | ASP.NET Core | `/health/live`, `/health/ready` |
+
+Guides: [docs/observability.md](docs/observability.md) · [Seq](docs/observability-seq.md) · [Prometheus/Grafana](docs/observability-prometheus.md) · Runbooks: [docs/runbooks/](docs/runbooks/)
+
+## Testing strategy
+
+| Suite | Project | Docker required |
+|-------|---------|-----------------|
+| Unit | `Catalog.UnitTests`, `Basket.UnitTests`, `Ordering.UnitTests` | No |
+| Integration | `IntegrationTests` | Yes (Testcontainers) |
+| Security | `Security.IntegrationTests` | Yes (Testcontainers) |
+
+```bash
+dotnet test tests/Catalog.UnitTests tests/Basket.UnitTests tests/Ordering.UnitTests
+dotnet test tests/IntegrationTests tests/Security.IntegrationTests   # requires Docker
+```
+
+CI runs build and unit tests on every push/PR. Integration and security tests are available locally with Docker — see [docs/testing.md](docs/testing.md).
+
+## Running with Docker Compose
+
+**Prerequisites:** Docker Desktop (or Docker Engine + Compose v2). .NET 10 SDK is optional for running containers only.
 
 ```bash
 git clone https://github.com/luismpenholato/Microservices.Ecommerce.git
@@ -70,53 +151,35 @@ cd Microservices.Ecommerce
 docker compose up -d --build
 ```
 
-| Serviço | URL |
+| Service | URL |
 |---------|-----|
 | ApiGateway | http://localhost:5000 |
 | Identity | http://localhost:5005 |
 | Grafana | http://localhost:3000 (admin/admin) |
 | Seq | http://localhost:5341 |
 | RabbitMQ UI | http://localhost:15672 (guest/guest) |
+| Prometheus | http://localhost:9090 |
 
-Catálogo público: http://localhost:5000/catalog/products
+Public catalog: http://localhost:5000/catalog/products
 
-## Validate local environment
+## Validate the local environment
 
-Scripts automatizam health, métricas e rotas básicas:
-
-```powershell
-.\scripts\validate-local.ps1
-```
+After `docker compose up -d --build`, wait for healthchecks (`docker compose ps`) and follow the manual checklist in [docs/smoke-tests.md](docs/smoke-tests.md). Quick checks:
 
 ```bash
-chmod +x scripts/validate-local.sh && ./scripts/validate-local.sh
+curl -s http://localhost:5000/health/ready
+curl -s http://localhost:5000/catalog/products
 ```
 
-Com checkout E2E (login + JWT + fluxo completo):
+For the full checkout flow, see [docs/examples/http-requests.md](docs/examples/http-requests.md).
 
-```powershell
-.\scripts\validate-local.ps1 -RunCheckoutFlow
-```
+## Demo credentials
 
-```bash
-./scripts/validate-local.sh --run-checkout-flow
-```
+> **Local demo only.** Do not use these credentials outside a local environment.
 
-## E2E checkout flow
-
-1. Login no Identity → `accessToken` + `customerId`
-2. `GET /catalog/products` (público)
-3. `POST /basket/.../items` e `checkout` com `Authorization: Bearer`
-4. Polling `GET /ordering/orders/{id}` até `Completed`
-5. Logs no Seq e métricas no Grafana
-
-Roteiro detalhado: [docs/smoke-tests.md](docs/smoke-tests.md) · Exemplos curl: [docs/examples/http-requests.md](docs/examples/http-requests.md)
-
-## Credenciais demo
-
-| Perfil | E-mail | Senha |
-|--------|--------|-------|
-| Cliente | `demo@ecommerce.local` | `Demo123!` |
+| Role | Email | Password |
+|------|-------|----------|
+| Customer | `demo@ecommerce.local` | `Demo123!` |
 | Admin | `admin@ecommerce.local` | `Admin123!` |
 
 ```bash
@@ -125,107 +188,73 @@ curl -s -X POST http://localhost:5000/identity/auth/login \
   -d '{"email":"demo@ecommerce.local","password":"Demo123!"}'
 ```
 
-## Padrões implementados
+## Service ports
 
-| Padrão | Onde |
-|--------|------|
-| Database per Service | Um banco PostgreSQL por serviço com estado |
-| API Gateway | YARP — roteamento e JWT na borda |
-| Transactional Outbox | Ordering, Payment, Inventory |
-| Idempotency-Key | Checkout Basket → Ordering |
-| Consumer idempotente | `(EventId, ConsumerName)` na mesma transação |
-| Retry + filas `_error` | MassTransit — replay manual |
-| Clean Architecture | Api / Application / Domain / Infrastructure |
-
-ADRs: [docs/decisions/](docs/decisions/)
-
-## Serviços
-
-| Serviço | Porta (host) | Persistência |
-|---------|--------------|--------------|
+| Service | Host port | Database / store |
+|---------|-----------|------------------|
 | ApiGateway | 5000 | — |
-| Identity | 5005 | `identity_db` |
 | Catalog | 5001 | `catalog_db` |
 | Basket | 5002 | Redis |
 | Ordering | 5003 | `ordering_db` |
 | Inventory | 5004 | `inventory_db` |
-| Payment.Worker | 5010 (ops) | `payment_db` |
-| Notification.Worker | 5011 (ops) | `notification_db` |
+| Identity | 5005 | `identity_db` |
+| Payment.Worker | 5010 | `payment_db` |
+| Notification.Worker | 5011 | `notification_db` |
+| PostgreSQL | 5432 | all databases |
+| Redis | 6379 | basket |
+| RabbitMQ | 5672 / 15672 (UI) | — |
+| Seq | 5341 | — |
+| Prometheus | 9090 | — |
+| Grafana | 3000 | — |
 
-## Observabilidade
-
-- **Logs:** Serilog → Seq — [guia](docs/observability-seq.md)
-- **Métricas:** `ecommerce_*` em `/metrics` — Prometheus + Grafana — [guia](docs/observability-prometheus.md)
-- **Health:** `/health/live`, `/health/ready`
-- **Runbooks:** [docs/runbooks/](docs/runbooks/) · [operations](docs/operations.md)
-
-## Segurança
-
-- IdentityService dedicado (register/login/me)
-- JWT com claims `sub`, `email`, `customer_id`, `role`
-- Gateway: basket/ordering protegidos; catalog GET público; catalog write = Admin
-- Basket/Ordering validam `customerId` da URL contra o token
-
-Detalhes: [docs/security.md](docs/security.md)
-
-## Testes
-
-```bash
-dotnet test                                    # todos (Docker para integração)
-dotnet test tests/Catalog.UnitTests tests/Basket.UnitTests tests/Ordering.UnitTests
-```
-
-| Suite | Docker |
-|-------|--------|
-| `*UnitTests` | Não |
-| `IntegrationTests` | Sim (Testcontainers) |
-| `Security.IntegrationTests` | Sim |
-
-CI no GitHub Actions: build + unitários + integração. Ver [docs/testing.md](docs/testing.md).
-
-## Estrutura do repositório
+## Repository structure
 
 ```
 src/
   ApiGateway/
-  BuildingBlocks/
-  Services/          # Catalog, Basket, Ordering, Identity, Payment, Inventory, Notification
+  BuildingBlocks/       # Contracts, Domain, Messaging, Observability, Web
+  Services/             # Catalog, Basket, Ordering, Identity, Payment, Inventory, Notification
 tests/
   *UnitTests, IntegrationTests, Security.IntegrationTests
-infra/               # Prometheus, Grafana, Postgres init
-docs/                # Arquitetura, segurança, testes, runbooks
-scripts/             # validate-local.ps1 / .sh
+infra/                  # Prometheus, Grafana, Postgres init
+docs/                   # Architecture, security, testing, runbooks, ADRs
 docker-compose.yml
 ```
 
-## Trade-offs
+## CI
 
-| Benefício | Custo |
-|-----------|-------|
-| Serviços independentes e evolução por contexto | Complexidade operacional e debugging distribuído |
-| Outbox + idempotência robustos | Latência e estados intermediários visíveis |
-| Stack completa de observabilidade | Mais componentes no `docker compose` |
-| JWT simples (HMAC) para portfólio | Segredo compartilhado — ver [ROADMAP](ROADMAP.md) para JWKS |
+GitHub Actions workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+
+1. **build** — restore and build the solution
+2. **unit-tests** — `Catalog`, `Basket`, `Ordering` unit tests
+
+Integration and security tests are **not** run in CI (require Docker locally). Run them manually when needed.
+
+## Documentation
+
+| Document | Content |
+|----------|---------|
+| [architecture.md](docs/architecture.md) | Technical overview and diagrams |
+| [service-communication.md](docs/service-communication.md) | HTTP vs events, outbox, retry |
+| [security.md](docs/security.md) | JWT, roles, demo credentials |
+| [testing.md](docs/testing.md) | Test strategy and CI |
+| [operations.md](docs/operations.md) | Health, metrics, validation |
+| [smoke-tests.md](docs/smoke-tests.md) | Manual end-to-end flow |
+| [deployment.md](docs/deployment.md) | Deployment notes (local/demo scope) |
+
+## Conscious trade-offs
+
+| Benefit | Cost |
+|---------|------|
+| Independent services and bounded contexts | Operational complexity and distributed debugging |
+| Robust outbox + idempotency | Visible intermediate states and latency |
+| Full local observability stack | More containers in `docker compose` |
+| Simple HMAC JWT for portfolio demos | Shared secret across services — see [ROADMAP](ROADMAP.md) for JWKS |
 
 ## Roadmap
 
-Itens futuros (não implementados): refresh token, JWT assimétrico, Alertmanager, contract tests, rate limiting, Kubernetes/Aspire, e mais — [ROADMAP.md](ROADMAP.md).
+Implemented features are documented above. Planned items (refresh tokens, asymmetric JWT, Alertmanager, contract tests, Kubernetes/Aspire, and more) are tracked in [ROADMAP.md](ROADMAP.md).
 
-## Documentação
-
-| Documento | Conteúdo |
-|-----------|----------|
-| [architecture.md](docs/architecture.md) | Visão técnica e diagramas |
-| [service-communication.md](docs/service-communication.md) | HTTP vs eventos, outbox, retry |
-| [security.md](docs/security.md) | JWT, roles, credenciais demo |
-| [testing.md](docs/testing.md) | Estratégia e CI |
-| [operations.md](docs/operations.md) | Health, métricas, validação |
-| [smoke-tests.md](docs/smoke-tests.md) | Fluxo manual ponta a ponta |
-
-## Contribuindo
-
-Veja [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Licença
+## License
 
 [MIT](LICENSE) — Copyright (c) 2026 Luis Penholato

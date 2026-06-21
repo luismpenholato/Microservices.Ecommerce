@@ -1,13 +1,13 @@
-# ADR 0002: API Gateway com YARP
+# ADR 0002: API Gateway with YARP
 
 ## Status
 
-Aceito
+Accepted
 
-## Decisão
+## Decision
 
-Usar YARP para centralizar rotas `/catalog`, `/basket`, `/ordering`.
+Use YARP to centralize routes `/catalog`, `/basket`, `/ordering`.
 
-## Motivo
+## Rationale
 
-Simplicidade nativa em .NET, sem dependência extra de Ocelot para este escopo.
+Native simplicity in .NET, without extra Ocelot dependency for this scope.

@@ -1,9 +1,9 @@
-# Deploy local
+# Local deployment
 
-## Pré-requisitos
+## Prerequisites
 
 - Docker Desktop
-- .NET 10 SDK (desenvolvimento local sem Docker)
+- .NET 10 SDK (local development without Docker)
 
 ## Docker Compose
 
@@ -11,10 +11,10 @@
 docker compose up --build
 ```
 
-Portas:
+Ports:
 
-| Serviço | Porta |
-|---------|-------|
+| Service | Port |
+|---------|------|
 | ApiGateway | 5000 |
 | Catalog | 5001 |
 | Basket | 5002 |
@@ -24,7 +24,7 @@ Portas:
 | PostgreSQL | 5432 |
 | Redis | 6379 |
 
-## Exemplos via Gateway
+## Examples via Gateway
 
 - `GET http://localhost:5000/catalog/products`
 - `GET http://localhost:5000/basket/baskets/{customerId}`

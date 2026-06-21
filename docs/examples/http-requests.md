@@ -1,14 +1,14 @@
-# Exemplos HTTP (curl)
+# HTTP examples (curl)
 
-Base URL do **ApiGateway**: `http://localhost:5000`
+**ApiGateway** base URL: `http://localhost:5000`
 
-Validação automatizada (inclui fluxo abaixo): `.\scripts\validate-local.ps1 -RunCheckoutFlow` ou `./scripts/validate-local.sh --run-checkout-flow`
+End-to-end manual flow: [smoke-tests.md](../smoke-tests.md).
 
-URLs diretas dos serviços (debug): Catalog `5001`, Basket `5002`, Ordering `5003`, Inventory `5004`, Payment.Worker `5010`, Notification.Worker `5011`.
+Direct service URLs (debug): Catalog `5001`, Basket `5002`, Ordering `5003`, Inventory `5004`, Payment.Worker `5010`, Notification.Worker `5011`.
 
-IDs de seed do catálogo/estoque:
+Catalog/inventory seed IDs:
 
-| Produto | ProductId |
+| Product | ProductId |
 |---------|-----------|
 | Notebook Pro | `11111111-1111-1111-1111-111111111101` |
 | Teclado Mecânico | `11111111-1111-1111-1111-111111111102` |
@@ -25,20 +25,20 @@ curl -s -X POST http://localhost:5000/identity/auth/login \
   -d '{"email":"demo@ecommerce.local","password":"Demo123!"}'
 ```
 
-Salve `accessToken` e `customerId` da resposta.
+Save `accessToken` and `customerId` from the response.
 
 ### Register
 
 ```bash
 curl -s -X POST http://localhost:5000/identity/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email":"meu@email.com","password":"MinhaSenha123!"}'
+  -d '{"email":"me@email.com","password":"MyPassword123!"}'
 ```
 
-### Me (autenticado)
+### Me (authenticated)
 
 ```bash
-TOKEN="cole_o_access_token_aqui"
+TOKEN="paste_access_token_here"
 curl -s http://localhost:5000/identity/auth/me \
   -H "Authorization: Bearer $TOKEN"
 ```
@@ -47,7 +47,7 @@ curl -s http://localhost:5000/identity/auth/me \
 
 ## Health
 
-### Live (processo)
+### Live (process)
 
 ```bash
 curl -s http://localhost:5000/health/live
@@ -55,7 +55,7 @@ curl -s http://localhost:5003/health/live
 curl -s http://localhost:5010/health/live
 ```
 
-### Ready (dependências)
+### Ready (dependencies)
 
 ```bash
 curl -s http://localhost:5000/health/ready
@@ -81,13 +81,13 @@ curl -s http://localhost:5010/metrics | grep ecommerce_consumer
 
 ## Catalog (via Gateway)
 
-### Listar produtos
+### List products
 
 ```bash
 curl -s http://localhost:5000/catalog/products
 ```
 
-### Direto no serviço
+### Direct to service
 
 ```bash
 curl -s http://localhost:5001/api/products
@@ -97,21 +97,21 @@ curl -s http://localhost:5001/api/products
 
 ## Basket (via Gateway)
 
-Requer `Authorization: Bearer`. Use o `customerId` retornado no login (claim `customer_id`).
+Requires `Authorization: Bearer`. Use the `customerId` returned on login (`customer_id` claim).
 
 ```bash
-TOKEN="cole_o_access_token_aqui"
-CUSTOMER_ID="cole_o_customer_id_do_login"
+TOKEN="paste_access_token_here"
+CUSTOMER_ID="paste_customer_id_from_login"
 ```
 
-### Obter carrinho
+### Get cart
 
 ```bash
 curl -s http://localhost:5000/basket/baskets/$CUSTOMER_ID \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### Adicionar item
+### Add item
 
 ```bash
 curl -s -X POST http://localhost:5000/basket/baskets/$CUSTOMER_ID/items \
@@ -125,7 +125,7 @@ curl -s -X POST http://localhost:5000/basket/baskets/$CUSTOMER_ID/items \
   }'
 ```
 
-### Remover item
+### Remove item
 
 ```bash
 curl -s -X DELETE \
@@ -134,7 +134,7 @@ curl -s -X DELETE \
 
 ### Checkout
 
-O Basket calcula e envia `Idempotency-Key` ao Ordering.
+Basket computes and sends `Idempotency-Key` to Ordering.
 
 ```bash
 curl -s -X POST http://localhost:5000/basket/baskets/$CUSTOMER_ID/checkout \
@@ -143,9 +143,9 @@ curl -s -X POST http://localhost:5000/basket/baskets/$CUSTOMER_ID/checkout \
 
 ---
 
-## Checkout com Idempotency-Key (Ordering direto)
+## Checkout with Idempotency-Key (direct to Ordering)
 
-Chamada direta ao Ordering (útil para testes de idempotência sem passar pelo Basket):
+Direct call to Ordering (useful for idempotency tests without going through Basket):
 
 ```bash
 curl -s -X POST http://localhost:5003/api/orders \
@@ -165,10 +165,10 @@ curl -s -X POST http://localhost:5003/api/orders \
   }'
 ```
 
-Repetir a mesma requisição com o mesmo `Idempotency-Key` deve retornar o mesmo pedido (`id` idêntico):
+Repeating the same request with the same `Idempotency-Key` should return the same order (identical `id`):
 
 ```bash
-KEY="validate-local-demo-001"
+KEY="idempotency-demo-001"
 BODY='{"customerId":"22222222-2222-2222-2222-222222222299","items":[{"productId":"11111111-1111-1111-1111-111111111101","productName":"Notebook Pro","quantity":1,"unitPrice":5499.90}]}'
 
 curl -s -X POST http://localhost:5000/ordering/orders \
@@ -178,7 +178,7 @@ curl -s -X POST http://localhost:5000/ordering/orders \
   -H "Content-Type: application/json" -H "Idempotency-Key: $KEY" -d "$BODY"
 ```
 
-O script `validate-local` executa esse par de chamadas e compara o campo `id` das duas respostas.
+Both responses should return the same order `id`.
 
 Via Gateway:
 
@@ -203,13 +203,13 @@ curl -s -X POST http://localhost:5000/ordering/orders \
 
 ## Ordering
 
-### Pedido por id
+### Order by id
 
 ```bash
 curl -s http://localhost:5000/ordering/orders/{orderId}
 ```
 
-### Pedidos por cliente
+### Orders by customer
 
 ```bash
 curl -s http://localhost:5000/ordering/orders/customer/22222222-2222-2222-2222-222222222201
@@ -219,13 +219,13 @@ curl -s http://localhost:5000/ordering/orders/customer/22222222-2222-2222-2222-2
 
 ## Inventory
 
-### Consultar estoque (Gateway)
+### Query stock (Gateway)
 
 ```bash
 curl -s http://localhost:5000/inventory/inventory/11111111-1111-1111-1111-111111111101
 ```
 
-### Atualizar quantidade (Gateway)
+### Update quantity (Gateway)
 
 ```bash
 curl -s -X PUT http://localhost:5000/inventory/inventory/11111111-1111-1111-1111-111111111101 \
@@ -233,7 +233,7 @@ curl -s -X PUT http://localhost:5000/inventory/inventory/11111111-1111-1111-1111
   -d '{ "availableQuantity": 50 }'
 ```
 
-### Direto no serviço
+### Direct to service
 
 ```bash
 curl -s http://localhost:5004/api/inventory/11111111-1111-1111-1111-111111111101
@@ -241,11 +241,11 @@ curl -s http://localhost:5004/api/inventory/11111111-1111-1111-1111-111111111101
 
 ---
 
-## Correlation id (opcional)
+## Correlation id (optional)
 
 ```bash
 curl -s http://localhost:5000/catalog/products \
   -H "X-Correlation-Id: my-trace-123"
 ```
 
-Propagação nos logs Seq: filtrar por `CorrelationId = 'my-trace-123'`.
+Seq log propagation: filter by `CorrelationId = 'my-trace-123'`.

@@ -2,18 +2,18 @@
 
 ## Status
 
-Aceito
+Accepted
 
-## Contexto
+## Context
 
-Publicar eventos diretamente após `SaveChanges` pode deixar o sistema inconsistente se o broker falhar.
+Publishing events directly after `SaveChanges` can leave the system inconsistent if the broker fails.
 
-## Decisão
+## Decision
 
-Persistir eventos em `outbox_messages` na mesma transação do estado de negócio e publicar via `OutboxDispatcher` (BackgroundService) com retry.
+Persist events in `outbox_messages` in the same transaction as business state and publish via `OutboxDispatcher` (BackgroundService) with retry.
 
-## Consequências
+## Consequences
 
-- Publicação eventual (latência de segundos)
-- Consistência forte entre banco e intenção de publicação
-- Dispatcher idempotente por `EventId` único na outbox
+- Eventual publication (seconds of latency)
+- Strong consistency between database and publish intent
+- Idempotent dispatcher via unique `EventId` in outbox

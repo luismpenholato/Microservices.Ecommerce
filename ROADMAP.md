@@ -1,30 +1,59 @@
 # Roadmap
 
-Itens planejados para evolução do portfólio — **sem compromisso de prazo**. Não fazem parte do escopo atual.
+Evolution items for this portfolio project — **no delivery commitment**. Use this file to separate what exists today from what is planned or explicitly out of scope.
 
-## Autenticação e segurança
+## Implemented
 
-- [ ] **Refresh token** — renovação de sessão sem novo login
-- [ ] **JWT assimétrico / JWKS** — rotação de chaves e validação sem segredo compartilhado em todos os serviços
-- [ ] **Rate limiting no Gateway** — proteção básica contra abuso de APIs públicas
+- YARP API Gateway as the single HTTP entry point
+- IdentityService with register / login / JWT (HMAC, shared secret for demo)
+- CatalogService with public GET and Admin-only writes
+- BasketService with Redis-backed cart and HTTP checkout
+- OrderingService with order lifecycle and transactional outbox
+- Payment.Worker — simulated payment approval/rejection
+- InventoryService — stock reservation via events
+- Notification.Worker — simulated notification logging
+- RabbitMQ + MassTransit with retry and `_error` queues
+- Idempotent consumers (`EventId` + `ConsumerName`)
+- Idempotency-Key on checkout (Basket → Ordering)
+- PostgreSQL database-per-service
+- Serilog → Seq, Prometheus `/metrics`, Grafana dashboards
+- Health checks (`/health/live`, `/health/ready`)
+- Docker Compose local stack
+- Unit, integration (Testcontainers), and security test suites
+- GitHub Actions CI (build + unit tests)
 
-## Operação e resiliência
+See [README.md](README.md) and [docs/](docs/) for details.
 
-- [ ] **Alertmanager** — alertas Prometheus para outbox pendente, filas `_error`, health degradado
-- [ ] **Replay manual assistido de DLQ** — ferramenta ou runbook guiado para reprocessar filas `_error` com auditoria
-- [ ] **Admin UI simples** — painel mínimo para produtos/estoque (role Admin)
+## Planned
 
-## Plataforma e entrega
+### Authentication and security
 
-- [ ] **Kubernetes manifests** ou **.NET Aspire** — orquestração local/cloud
-- [ ] **Pipeline CD** — deploy automatizado após CI verde
+- [ ] **Refresh token** — session renewal without re-login
+- [ ] **Asymmetric JWT / JWKS** — key rotation without a shared secret on every service
+- [ ] **Rate limiting at the Gateway** — basic protection against API abuse
 
-## Qualidade e contratos
+### Operations and resilience
 
-- [ ] **Contract tests** — validação de schemas de eventos HTTP/mensageria
-- [ ] **Consumer-driven contracts** — Pact ou equivalente entre Basket/Ordering e consumidores
-- [ ] **Saga orchestration** — compensações explícitas em fluxos de falha de pagamento/estoque
+- [ ] **Alertmanager** — Prometheus alerts for stuck outbox, `_error` queues, degraded health
+- [ ] **Assisted DLQ replay** — guided tool or runbook to reprocess `_error` queues with audit trail
+- [ ] **Simple Admin UI** — minimal panel for products/stock (Admin role)
 
-## Referências atuais
+### Platform and delivery
 
-O que já está implementado está documentado em [README.md](README.md) e [docs/](docs/).
+- [ ] **Kubernetes manifests** or **.NET Aspire** — local/cloud orchestration
+- [ ] **CD pipeline** — automated deploy after green CI
+
+### Quality and contracts
+
+- [ ] **Contract tests** — HTTP/messaging event schema validation
+- [ ] **Consumer-driven contracts** — Pact or equivalent between producers and consumers
+- [ ] **Saga orchestration** — explicit compensations for payment/inventory failure paths
+
+## Not planned for this demo
+
+- Production-grade multi-region deployment
+- Real payment provider integration (Stripe, PayPal, etc.)
+- Customer-facing web or mobile frontend
+- Full e-commerce feature set (search, recommendations, promotions, etc.)
+- OpenTelemetry distributed tracing (Serilog correlation exists; full tracing is roadmap-only)
+- Kafka or other brokers replacing RabbitMQ for this repository

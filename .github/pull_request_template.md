@@ -1,24 +1,24 @@
-## Resumo
+## Summary
 
-<!-- O que este PR faz e por quê -->
+<!-- What this PR does and why -->
 
-## Tipo de mudança
+## Change type
 
 - [ ] Bug fix
-- [ ] Documentação
-- [ ] Testes
-- [ ] Refatoração (sem mudança de comportamento)
-- [ ] Outro
+- [ ] Documentation
+- [ ] Tests
+- [ ] Refactoring (no behavior change)
+- [ ] Other
 
-## Como testei
+## How I tested
 
-- [ ] `dotnet build`
+- [ ] `dotnet build Microservices.Ecommerce.sln -c Release`
 - [ ] `dotnet test`
-- [ ] `scripts/validate-local` (com ou sem `-RunCheckoutFlow`)
-- [ ] Outro: <!-- descreva -->
+- [ ] Manual smoke test ([docs/smoke-tests.md](docs/smoke-tests.md)) when changing runtime behavior
+- [ ] Other: <!-- describe -->
 
 ## Checklist
 
-- [ ] Não inclui segredos ou credenciais reais
-- [ ] Testes adicionados/atualizados quando aplicável
-- [ ] Documentação atualizada quando aplicável
+- [ ] No secrets or real production credentials included
+- [ ] Tests added/updated when applicable
+- [ ] Documentation updated when applicable

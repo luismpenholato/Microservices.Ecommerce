@@ -1,39 +1,28 @@
-# Operações — Microservices.Ecommerce
+# Operations — Microservices.Ecommerce
 
-Guia para operação local demonstrável (sem Kafka/Alertmanager em produção).
+Guide for demonstrable local operation (no Kafka/Alertmanager in production).
 
-## Validação automatizada
+## Local validation
 
-```powershell
-.\scripts\validate-local.ps1
-```
+Use the manual checklist in [smoke-tests.md](./smoke-tests.md). Security: [security.md](./security.md). Testing: [testing.md](./testing.md). curl examples: [examples/http-requests.md](./examples/http-requests.md).
 
-```bash
-./scripts/validate-local.sh
-./scripts/validate-local.sh --run-checkout-flow
-```
-
-Checkout E2E opcional: `-RunCheckoutFlow` (PowerShell) / `--run-checkout-flow` (Bash).
-
-Smoke tests: [smoke-tests.md](./smoke-tests.md). Segurança: [security.md](./security.md). Testes: [testing.md](./testing.md). Exemplos curl: [examples/http-requests.md](./examples/http-requests.md).
-
-## Endpoints operacionais
+## Operational endpoints
 
 | Endpoint | APIs | Workers |
 |----------|------|---------|
-| `GET /health/live` | Sim | Sim |
-| `GET /health/ready` | Sim | Sim |
-| `GET /metrics` | Sim | Sim |
+| `GET /health/live` | Yes | Yes |
+| `GET /health/ready` | Yes | Yes |
+| `GET /metrics` | Yes | Yes |
 
-- **live**: processo responde (não valida dependências).
-- **ready**: dependências reais do serviço (ver tabela abaixo).
+- **live**: process responds (does not validate dependencies).
+- **ready**: real dependencies for the service (see table below).
 
-## Health checks por serviço
+## Health checks per service
 
-| Serviço | ready valida |
-|---------|----------------|
+| Service | ready validates |
+|---------|-----------------|
 | Identity | PostgreSQL `identity_db` |
-| ApiGateway | Configuração YARP (`gateway`) |
+| ApiGateway | YARP configuration (`gateway`) |
 | Catalog | PostgreSQL `catalog_db` |
 | Basket | Redis |
 | Ordering | PostgreSQL + RabbitMQ |
@@ -41,12 +30,12 @@ Smoke tests: [smoke-tests.md](./smoke-tests.md). Segurança: [security.md](./sec
 | Payment.Worker | PostgreSQL + RabbitMQ |
 | Notification.Worker | PostgreSQL + RabbitMQ |
 
-## Métricas (`ecommerce_*`)
+## Metrics (`ecommerce_*`)
 
-Expostas em `/metrics` (Prometheus via OpenTelemetry).
+Exposed at `/metrics` (Prometheus via OpenTelemetry).
 
-| Métrica | Tipo | Labels |
-|---------|------|--------|
+| Metric | Type | Labels |
+|--------|------|--------|
 | `ecommerce_consumer_messages_processed_total` | Counter | `service`, `consumer_name` |
 | `ecommerce_consumer_messages_failed_total` | Counter | `service`, `consumer_name` |
 | `ecommerce_outbox_messages_pending` | Observable gauge | `service` |
@@ -60,13 +49,13 @@ Expostas em `/metrics` (Prometheus via OpenTelemetry).
 | `ecommerce_stock_reservations_approved_total` | Counter | — |
 | `ecommerce_stock_reservations_failed_total` | Counter | — |
 
-## Configuração (precedência)
+## Configuration (precedence)
 
 1. `appsettings.json`
-2. `appsettings.{Environment}.json` (ex.: `Development`, `Docker`)
-3. Variáveis de ambiente (docker-compose) — **maior precedência**
+2. `appsettings.{Environment}.json` (e.g. `Development`, `Docker`)
+3. Environment variables (docker-compose) — **highest precedence**
 
-Exemplos no compose:
+Examples in compose:
 
 ```yaml
 ConnectionStrings__OrderingDb: Host=postgres;...
@@ -75,9 +64,9 @@ ASPNETCORE_ENVIRONMENT: Docker
 OpenTelemetry__PrometheusEnabled: "true"
 ```
 
-## Stack local (Docker Compose)
+## Local stack (Docker Compose)
 
-| Serviço | URL |
+| Service | URL |
 |---------|-----|
 | ApiGateway | http://localhost:5000 |
 | Prometheus | http://localhost:9090 |
@@ -91,19 +80,19 @@ docker compose up --build
 
 ## Runbooks
 
-- [Mensagem em `_error`](./runbooks/consumer-message-in-error-queue.md)
-- [Outbox preso](./runbooks/outbox-messages-stuck.md)
-- [Serviço unhealthy](./runbooks/service-unhealthy.md)
-- [Banco indisponível](./runbooks/database-unavailable.md)
-- [RabbitMQ indisponível](./runbooks/rabbitmq-unavailable.md)
+- [Message in `_error`](./runbooks/consumer-message-in-error-queue.md)
+- [Stuck outbox](./runbooks/outbox-messages-stuck.md)
+- [Unhealthy service](./runbooks/service-unhealthy.md)
+- [Database unavailable](./runbooks/database-unavailable.md)
+- [RabbitMQ unavailable](./runbooks/rabbitmq-unavailable.md)
 
-## Observabilidade
+## Observability
 
 - Logs: [observability-seq.md](./observability-seq.md)
-- Métricas: [observability-prometheus.md](./observability-prometheus.md)
+- Metrics: [observability-prometheus.md](./observability-prometheus.md)
 
 ## Graceful shutdown
 
-- `OutboxDispatcher` respeita `CancellationToken`.
-- Cada mensagem do outbox é persistida **individualmente** após tentativa de publicação.
-- Cancelamento **não** marca `ProcessedAtUtc` se a publicação não concluiu.
+- `OutboxDispatcher` respects `CancellationToken`.
+- Each outbox message is persisted **individually** after a publish attempt.
+- Cancellation **does not** set `ProcessedAtUtc` if publication did not complete.

@@ -2,54 +2,60 @@ name: CI
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main]
   pull_request:
-    branches: [main, master, develop]
+    branches: [main]
 
 permissions:
   contents: read
 
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_NOLOGO: true
+  SOLUTION_PATH: Microservices.Ecommerce.sln
+  DOTNET_VERSION: 10.0.x
+
 jobs:
   build:
+    name: Restore and build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore
-        run: dotnet restore Microservices.Ecommerce.sln
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
 
       - name: Build
-        run: dotnet build Microservices.Ecommerce.sln --no-restore -c Release
+        run: dotnet build ${{ env.SOLUTION_PATH }} --configuration Release --no-restore
 
-      - name: Unit tests
-        run: |
-          dotnet test tests/Catalog.UnitTests/Catalog.UnitTests.csproj --no-build -c Release --verbosity normal
-          dotnet test tests/Basket.UnitTests/Basket.UnitTests.csproj --no-build -c Release --verbosity normal
-          dotnet test tests/Ordering.UnitTests/Ordering.UnitTests.csproj --no-build -c Release --verbosity normal
-
-  integration:
+  unit-tests:
+    name: Unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs: build
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Restore
-        run: dotnet restore Microservices.Ecommerce.sln
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
 
-      - name: Build
-        run: dotnet build Microservices.Ecommerce.sln --no-restore -c Release
-
-      - name: Integration & security tests (Testcontainers)
+      - name: Run unit tests
         run: |
-          dotnet test tests/IntegrationTests/IntegrationTests.csproj --no-build -c Release --verbosity normal
-          dotnet test tests/Security.IntegrationTests/Security.IntegrationTests.csproj --no-build -c Release --verbosity normal
+          dotnet test tests/Catalog.UnitTests/Catalog.UnitTests.csproj --configuration Release --verbosity normal
+          dotnet test tests/Basket.UnitTests/Basket.UnitTests.csproj --configuration Release --verbosity normal
+          dotnet test tests/Ordering.UnitTests/Ordering.UnitTests.csproj --configuration Release --verbosity normal

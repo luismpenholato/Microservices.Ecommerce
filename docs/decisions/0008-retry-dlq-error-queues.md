@@ -1,68 +1,68 @@
-# ADR 0008: Retry, error queues e reprocessamento manual
+# ADR 0008: Retry, error queues, and manual reprocessing
 
 ## Status
 
-Aceito
+Accepted
 
-## Contexto
+## Context
 
-Consumidores MassTransit e `OutboxDispatcher` podem falhar por indisponibilidade transitória (rede, banco, broker). Precisamos de limites claros de retry e destino das mensagens que não recuperam automaticamente.
+MassTransit consumers and `OutboxDispatcher` can fail due to transient unavailability (network, database, broker). We need clear retry limits and a destination for messages that do not recover automatically.
 
-## Decisão
+## Decision
 
-### 1. Retry de consumer (MassTransit)
+### 1. Consumer retry (MassTransit)
 
-Configuração em `MessageBusOptions` (`MessageBus:RetryLimit`, `MessageBus:RetryIntervalSeconds`):
+Configuration in `MessageBusOptions` (`MessageBus:RetryLimit`, `MessageBus:RetryIntervalSeconds`):
 
-- Aplicado via `UseMessageRetry` nos endpoints RabbitMQ.
-- **Não** marca `processed_integration_events` em falha (transação revertida no `IntegrationEventUnitOfWork`).
-- Após esgotar retries, a mensagem vai para a fila de erro do endpoint.
+- Applied via `UseMessageRetry` on RabbitMQ endpoints.
+- **Does not** write `processed_integration_events` on failure (transaction rolled back in `IntegrationEventUnitOfWork`).
+- After retries exhausted, message goes to the endpoint error queue.
 
-### 2. Retry de outbox (publicação)
+### 2. Outbox retry (publishing)
 
-Configuração separada em `OutboxOptions` (`Outbox:MaxPublishRetries`, `Outbox:PollIntervalSeconds`, etc.):
+Separate configuration in `OutboxOptions` (`Outbox:MaxPublishRetries`, `Outbox:PollIntervalSeconds`, etc.):
 
-- Independente do retry de consumer.
-- Incrementa `RetryCount` na tabela `outbox_messages`.
-- Não confundir com retry MassTransit.
+- Independent from consumer retry.
+- Increments `RetryCount` in `outbox_messages` table.
+- Do not confuse with MassTransit retry.
 
 ### 3. Error queues (`{endpoint}_error`)
 
-Com RabbitMQ + MassTransit (kebab-case):
+With RabbitMQ + MassTransit (kebab-case):
 
-- Após falhas no consumer, a mensagem é movida para `{nome-do-endpoint}_error`.
-- Exemplo: `payment-approved-consumer` → `payment-approved-consumer_error`.
-- **Não há compensação automática** nem replay automático para o fluxo de negócio.
-- Reprocessamento é **ação operacional manual** (requeue, correção e republicação, ou descarte consciente).
+- After consumer failures, message moves to `{endpoint-name}_error`.
+- Example: `payment-approved-consumer` → `payment-approved-consumer_error`.
+- **No automatic compensation** or automatic replay for the business flow.
+- Reprocessing is a **manual operational action** (requeue, fix and republish, or conscious discard).
 
-### 4. Observabilidade de falhas técnicas
+### 4. Technical failure observability
 
-`IntegrationEventConsumeObserver` registra em log estruturado:
+`IntegrationEventConsumeObserver` logs in structured form:
 
-- `MessageType`, `ConsumerName`, `EventId`, `CorrelationId`, `OrderId` (quando aplicável), exceção.
-- Não substitui logs de negócio nos handlers Application.
+- `MessageType`, `ConsumerName`, `EventId`, `CorrelationId`, `OrderId` (when applicable), exception.
+- Does not replace business logs in Application handlers.
 
-### 5. Hook de teste
+### 5. Test hook
 
-`IConsumerExecutionFaultHook` com implementação `NoOp` em produção; testes substituem para simular falha transitória sem afetar Application.
+`IConsumerExecutionFaultHook` with `NoOp` implementation in production; tests substitute to simulate transient failure without affecting Application.
 
-## Consequências
+## Consequences
 
-### Positivas
+### Positive
 
-- Separação clara entre falha de consumo e falha de publicação.
-- Idempotência transacional + retry reduz duplicidade de efeito.
-- Error queues permitem inspeção no RabbitMQ Management.
+- Clear separation between consumption failure and publish failure.
+- Transactional idempotency + retry reduces duplicate effects.
+- Error queues allow inspection in RabbitMQ Management.
 
-### Negativas / trade-offs
+### Negative / trade-offs
 
-- Mensagens em `_error` exigem runbook operacional.
-- Poison messages permanecem até intervenção.
-- Retry aumenta latência sob falha.
-- Concorrência de estoque pode gerar `DbUpdateConcurrencyException` e retries adicionais (esperado).
+- Messages in `_error` require operational runbook.
+- Poison messages remain until intervention.
+- Retry increases latency under failure.
+- Stock concurrency may cause `DbUpdateConcurrencyException` and additional retries (expected).
 
-## Alternativas consideradas
+## Alternatives considered
 
-- **Kafka DLQ**: fora de escopo.
-- **Replay automático da error queue**: complexidade e risco de reprocessar sem idempotência; adiado.
-- **Saga centralizada**: adiado; compensação explícita futura.
+- **Kafka DLQ**: out of scope.
+- **Automatic error queue replay**: complexity and risk of reprocessing without idempotency; deferred.
+- **Centralized saga**: deferred; explicit compensation in the future.

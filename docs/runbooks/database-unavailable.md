@@ -1,12 +1,12 @@
-# Runbook: banco de dados indisponível
+# Runbook: database unavailable
 
-## Sintoma
+## Symptom
 
-- `/health/ready` Unhealthy com check `*-db` ou `npgsql`.
-- Exceções `Npgsql`, timeout de conexão, `57P03` (cannot connect).
-- APIs retornam 500 em operações com persistência.
+- `/health/ready` Unhealthy with `*-db` or `npgsql` check.
+- `Npgsql` exceptions, connection timeout, `57P03` (cannot connect).
+- APIs return 500 on persistence operations.
 
-## Como identificar
+## How to identify
 
 ### Health
 
@@ -14,7 +14,7 @@
 curl -s http://localhost:5003/health/ready | jq
 ```
 
-Procure entradas `ordering-db`, `catalog-db`, `inventory-db`, etc.
+Look for entries `ordering-db`, `catalog-db`, `inventory-db`, etc.
 
 ### Docker
 
@@ -29,9 +29,9 @@ docker compose logs postgres --tail 50
 @Message like '%database%' and @Level = 'Error'
 ```
 
-## Bancos por serviço
+## Databases per service
 
-| Serviço | Database | Connection string (Docker) |
+| Service | Database | Connection string (Docker) |
 |---------|----------|----------------------------|
 | Catalog | `catalog_db` | `Host=postgres;Database=catalog_db;...` |
 | Ordering | `ordering_db` | `Host=postgres;Database=ordering_db;...` |
@@ -39,23 +39,23 @@ docker compose logs postgres --tail 50
 | Inventory | `inventory_db` | `Host=postgres;Database=inventory_db;...` |
 | Notification | `notification_db` | `Host=postgres;Database=notification_db;...` |
 
-## Impacto
+## Impact
 
-- Serviços afetados **não** gravam estado nem outbox.
-- Consumers falham e podem ir para `_error` após retries.
-- Outbox acumula pendências quando o DB volta (se broker OK).
+- Affected services **cannot** write state or outbox.
+- Consumers fail and may go to `_error` after retries.
+- Outbox accumulates pending messages when DB recovers (if broker OK).
 
-## Ação recomendada
+## Recommended action
 
-1. Suba o Postgres: `docker compose up -d postgres`.
-2. Aguarde health `healthy` do container.
-3. Verifique se os databases existem (`infra/postgres/init-databases.sql` na primeira subida).
-4. Reinicie APIs/workers que falharam na migração: `docker compose restart ordering-api payment-worker`.
-5. Se migração pendente: logs na inicialização — executar `dotnet ef database update` apenas em dev local fora do compose.
+1. Start Postgres: `docker compose up -d postgres`.
+2. Wait for container health `healthy`.
+3. Verify databases exist (`infra/postgres/init-databases.sql` on first startup).
+4. Restart APIs/workers that failed migration: `docker compose restart ordering-api payment-worker`.
+5. If migration pending: check startup logs — run `dotnet ef database update` only in local dev outside compose.
 
-## Como validar recuperação
+## How to validate recovery
 
-1. `pg_isready` / health do container postgres OK.
-2. `/health/ready` dos serviços com DB → Healthy.
-3. Operação de escrita: criar pedido ou consultar catálogo.
-4. Outbox pendente diminui após recuperação ([outbox runbook](./outbox-messages-stuck.md)).
+1. `pg_isready` / postgres container health OK.
+2. `/health/ready` for DB services → Healthy.
+3. Write operation: create order or query catalog.
+4. Pending outbox decreases after recovery ([outbox runbook](./outbox-messages-stuck.md)).

@@ -1,21 +1,21 @@
-# Runbook: mensagem na fila `_error`
+# Runbook: message in `_error` queue
 
-## Sintoma
+## Symptom
 
-- Pedido parado em status intermediário (`Pending`, `PaymentApproved`, etc.).
-- Evento esperado não chega ao próximo serviço.
-- Fila de consumo normal vazia, mas há mensagens em fila `*_error` no RabbitMQ.
+- Order stuck in intermediate status (`Pending`, `PaymentApproved`, etc.).
+- Expected event does not reach the next service.
+- Normal consumer queue empty, but messages in `*_error` queue in RabbitMQ.
 
-## Como identificar
+## How to identify
 
 ### RabbitMQ Management
 
-1. Acesse `http://localhost:15672` (guest/guest no ambiente local).
-2. Aba **Queues**.
-3. Procure filas terminando em `_error`, por exemplo:
+1. Open `http://localhost:15672` (guest/guest in local environment).
+2. **Queues** tab.
+3. Look for queues ending in `_error`, for example:
    - `ordering-service-payment-approved-consumer_error`
    - `inventory-service-payment-approved-consumer_error`
-4. **Ready** > 0 indica mensagens aguardando intervenção manual.
+4. **Ready** > 0 indicates messages awaiting manual intervention.
 
 ### Logs (Seq)
 
@@ -23,49 +23,49 @@
 @Message like '%Consume fault%' or @Level = 'Error'
 ```
 
-Filtre por `ConsumerName`, `EventId`, `CorrelationId`, `OrderId`.
+Filter by `ConsumerName`, `EventId`, `CorrelationId`, `OrderId`.
 
-## Logs e queries úteis
+## Useful logs and queries
 
-| Onde | O que buscar |
-|------|----------------|
+| Where | What to search |
+|-------|----------------|
 | Seq | `Consume fault`, `MessageType`, `ConsumerName` |
-| PostgreSQL (serviço consumidor) | `processed_integration_events` **sem** linha para o `EventId` |
-| Métrica Prometheus | `ecommerce_consumer_messages_failed_total` aumentando |
+| PostgreSQL (consuming service) | `processed_integration_events` **without** row for `EventId` |
+| Prometheus metric | `ecommerce_consumer_messages_failed_total` increasing |
 
 ```sql
--- Ordering: evento não processado
+-- Ordering: event not processed
 SELECT * FROM processed_integration_events
 WHERE event_id = '<EventId>';
 ```
 
-## Impacto
+## Impact
 
-- Fluxo do pedido **interrompido** para aquele evento.
-- **Não há compensação automática** nem replay.
-- Outbox de outros serviços pode continuar publicando, gerando inconsistência parcial.
+- Order flow **interrupted** for that event.
+- **No automatic compensation** or replay.
+- Other services' outbox may keep publishing, causing partial inconsistency.
 
-## Ação recomendada
+## Recommended action
 
-1. Identifique a **causa raiz** no log da exceção (constraint, timeout, bug permanente).
-2. Se for falha **transitória já resolvida** (DB/broker voltou):
-   - No Management UI: abra a fila `_error`.
-   - Use **Get messages** para inspecionar payload (`EventId`, `OrderId`).
-   - **Requeue** ou republicar manualmente **somente** se idempotência estiver garantida (`EventId` + `ConsumerName`).
-3. Se for **bug permanente** (poison message):
-   - Corrija o código/dados.
-   - Faça deploy.
-   - Reprocesse ou descarte a mensagem com registro do `EventId`.
-4. **Não** delete a fila `_error` sem analisar as mensagens.
+1. Identify **root cause** in exception log (constraint, timeout, permanent bug).
+2. If **transient failure already resolved** (DB/broker recovered):
+   - In Management UI: open the `_error` queue.
+   - Use **Get messages** to inspect payload (`EventId`, `OrderId`).
+   - **Requeue** or manually republish **only** if idempotency is guaranteed (`EventId` + `ConsumerName`).
+3. If **permanent bug** (poison message):
+   - Fix code/data.
+   - Deploy.
+   - Reprocess or discard the message with `EventId` recorded.
+4. **Do not** delete the `_error` queue without analyzing messages.
 
-## Como validar recuperação
+## How to validate recovery
 
-1. Fila `_error` sem mensagens novas para o caso tratado (ou mensagem reprocessada com sucesso).
-2. Log: `Integration event committed` com mesmo `ConsumerName` e `EventId` (ou skip idempotente se já processado).
-3. Status do pedido evoluiu no Ordering (consulta API ou banco).
-4. Métrica `ecommerce_consumer_messages_processed_total` aumenta para o consumer.
+1. `_error` queue has no new messages for the handled case (or message reprocessed successfully).
+2. Log: `Integration event committed` with same `ConsumerName` and `EventId` (or idempotent skip if already processed).
+3. Order status progressed in Ordering (API or database query).
+4. Metric `ecommerce_consumer_messages_processed_total` increases for the consumer.
 
-## Referências
+## References
 
-- [ADR 0008 — Retry e error queues](../decisions/0008-retry-dlq-error-queues.md)
+- [ADR 0008 — Retry and error queues](../decisions/0008-retry-dlq-error-queues.md)
 - [service-communication.md](../service-communication.md)

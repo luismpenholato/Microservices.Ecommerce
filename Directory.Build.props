@@ -6,8 +6,8 @@
   </PropertyGroup>
 
   <!--
-    TreatWarningsAsErrors permanece false: o repositório ainda emite avisos de pacotes
-    (ex.: OpenTelemetry). Ative localmente se quiser modo estrito:
+    TreatWarningsAsErrors remains false: the repository still emits package warnings
+    (e.g. OpenTelemetry). Enable strict mode locally with:
     dotnet build /p:TreatWarningsAsErrors=true
   -->
   <PropertyGroup>

@@ -1,18 +1,18 @@
-# ADR 0001: Usar microserviços
+# ADR 0001: Use microservices
 
 ## Status
 
-Aceito
+Accepted
 
-## Contexto
+## Context
 
-Projeto de portfólio para demonstrar arquitetura distribuída em e-commerce.
+Portfolio project to demonstrate distributed architecture in e-commerce.
 
-## Decisão
+## Decision
 
-Adotar microserviços com bounded contexts claros (catálogo, carrinho, pedido, pagamento, estoque, notificação).
+Adopt microservices with clear bounded contexts (catalog, cart, order, payment, inventory, notification).
 
-## Consequências
+## Consequences
 
-- Maior complexidade operacional
-- Melhor isolamento, escalabilidade independente e alinhamento com domínio
+- Higher operational complexity
+- Better isolation, independent scalability, and domain alignment

@@ -1,13 +1,13 @@
-# Runbook: RabbitMQ indisponível
+# Runbook: RabbitMQ unavailable
 
-## Sintoma
+## Symptom
 
-- `/health/ready` Unhealthy com check `rabbitmq`.
-- MassTransit não conecta; logs de connection refused.
-- Outbox com mensagens pendentes e `last_error` relacionado ao broker.
-- Consumers param de processar.
+- `/health/ready` Unhealthy with `rabbitmq` check.
+- MassTransit cannot connect; connection refused logs.
+- Outbox with pending messages and `last_error` related to the broker.
+- Consumers stop processing.
 
-## Como identificar
+## How to identify
 
 ### Health
 
@@ -16,7 +16,7 @@ curl -s http://localhost:5003/health/ready
 curl -s http://localhost:5004/health/ready
 ```
 
-Serviços com RabbitMQ no ready: Ordering, Inventory, Payment.Worker, Notification.Worker.
+Services with RabbitMQ in ready: Ordering, Inventory, Payment.Worker, Notification.Worker.
 
 ### Docker
 
@@ -25,45 +25,45 @@ docker compose ps rabbitmq
 docker compose logs rabbitmq --tail 50
 ```
 
-Management UI: `http://localhost:15672` — se não abre, broker down.
+Management UI: `http://localhost:15672` — if it does not open, broker is down.
 
-### Métricas e logs
+### Metrics and logs
 
-- `ecommerce_outbox_messages_publish_failures_total` sobe.
-- `ecommerce_outbox_messages_pending` sobe.
+- `ecommerce_outbox_messages_publish_failures_total` increases.
+- `ecommerce_outbox_messages_pending` increases.
 - Seq: `outbox publish failed`, `Broker unreachable`, MassTransit errors.
 
-## Impacto
+## Impact
 
-- **Consumo** de eventos interrompido (após esgotar retry → `_error`).
-- **Publicação** via outbox falha; pedidos podem ficar sem Payment/Inventory/Notification.
-- HTTP de criação de pedido pode funcionar (Ordering grava DB + outbox local).
+- **Consumption** of events stops (after retry exhaustion → `_error`).
+- **Publishing** via outbox fails; orders may stall without Payment/Inventory/Notification.
+- HTTP order creation may still work (Ordering writes DB + local outbox).
 
-## Ação recomendada
+## Recommended action
 
-1. Suba o broker: `docker compose up -d rabbitmq`.
-2. Aguarde healthcheck `healthy`.
-3. Reinicie serviços que cacheiam conexão falha:
+1. Start the broker: `docker compose up -d rabbitmq`.
+2. Wait for healthcheck `healthy`.
+3. Restart services that cached a failed connection:
    ```bash
    docker compose restart ordering-api inventory-api payment-worker notification-worker
    ```
-4. **Não** apague filas sem entender impacto.
-5. Monitore outbox pendente diminuir após broker voltar.
+4. **Do not** delete queues without understanding the impact.
+5. Monitor pending outbox decreasing after the broker recovers.
 
-## Como validar recuperação
+## How to validate recovery
 
-1. Management UI acessível; filas de consumers existem.
+1. Management UI accessible; consumer queues exist.
 2. `/health/ready` → rabbitmq Healthy.
-3. `ecommerce_outbox_messages_published_total` aumenta.
-4. `ecommerce_consumer_messages_processed_total` aumenta.
-5. Pedido de teste progride além de `Pending`.
+3. `ecommerce_outbox_messages_published_total` increases.
+4. `ecommerce_consumer_messages_processed_total` increases.
+5. Test order progresses beyond `Pending`.
 
-## Configuração (Docker)
+## Configuration (Docker)
 
-| Variável | Exemplo |
+| Variable | Example |
 |----------|---------|
 | `RabbitMq__Host` | `rabbitmq` |
 | `RabbitMq__Username` | `guest` |
 | `RabbitMq__Password` | `guest` |
 
-Ver [operations.md](../operations.md) para precedência de configuração.
+See [operations.md](../operations.md) for configuration precedence.

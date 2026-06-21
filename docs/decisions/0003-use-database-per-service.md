@@ -2,12 +2,12 @@
 
 ## Status
 
-Aceito
+Accepted
 
-## Decisão
+## Decision
 
-Cada serviço com persistência própria: `catalog_db`, `ordering_db`, Redis para Basket.
+Each service with its own persistence: `catalog_db`, `ordering_db`, Redis for Basket.
 
-## Regra
+## Rule
 
-Nenhum serviço acessa diretamente o banco de outro.
+No service accesses another service's database directly.

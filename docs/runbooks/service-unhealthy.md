@@ -1,19 +1,19 @@
-# Runbook: serviço unhealthy
+# Runbook: unhealthy service
 
-## Sintoma
+## Symptom
 
-- `docker compose ps` mostra serviço `unhealthy`.
-- API retorna 503 em `/health/ready`.
-- Gateway ou cliente recebe timeout.
+- `docker compose ps` shows service `unhealthy`.
+- API returns 503 on `/health/ready`.
+- Gateway or client receives timeout.
 
-## Como identificar
+## How to identify
 
 ### Health endpoints
 
-| Endpoint | Significado |
-|----------|-------------|
-| `GET /health/live` | Processo responde (não valida DB/broker) |
-| `GET /health/ready` | Dependências obrigatórias OK |
+| Endpoint | Meaning |
+|----------|---------|
+| `GET /health/live` | Process responds (does not validate DB/broker) |
+| `GET /health/ready` | Required dependencies OK |
 
 ```bash
 curl -s http://localhost:5003/health/live
@@ -23,7 +23,7 @@ curl -s http://localhost:5003/health/ready
 Workers (Payment, Notification):
 
 ```bash
-curl -s http://localhost:8080/health/live   # porta conforme compose
+curl -s http://localhost:8080/health/live   # port per compose
 curl -s http://localhost:8080/health/ready
 ```
 
@@ -34,33 +34,33 @@ docker compose ps
 docker compose logs ordering-api --tail 100
 ```
 
-### Por serviço (ready)
+### Per service (ready)
 
-| Serviço | Ready valida |
-|---------|----------------|
+| Service | Ready validates |
+|---------|-----------------|
 | Catalog | PostgreSQL |
 | Basket | Redis |
 | Ordering | PostgreSQL + RabbitMQ |
 | Inventory | PostgreSQL + RabbitMQ |
 | Payment.Worker | PostgreSQL + RabbitMQ |
 | Notification.Worker | PostgreSQL + RabbitMQ |
-| ApiGateway | self/config (não bloqueia por downstream) |
+| ApiGateway | self/config (does not block on downstream) |
 
-## Impacto
+## Impact
 
-- Orquestrador/compose pode não rotear tráfego.
-- Checkout ou consumo de eventos indisponível para o serviço afetado.
+- Orchestrator/compose may not route traffic.
+- Checkout or event consumption unavailable for the affected service.
 
-## Ação recomendada
+## Recommended action
 
-1. Se **live** falha: processo travado — `docker compose restart <serviço>`.
-2. Se **live** OK e **ready** falha: identifique dependência no JSON do health (Unhealthy description).
-3. Siga runbook específico: [database](./database-unavailable.md) ou [rabbitmq](./rabbitmq-unavailable.md).
-4. ApiGateway unhealthy: verifique configuração YARP, não os microserviços downstream.
+1. If **live** fails: process stuck — `docker compose restart <service>`.
+2. If **live** OK and **ready** fails: identify dependency in health JSON (Unhealthy description).
+3. Follow specific runbook: [database](./database-unavailable.md) or [rabbitmq](./rabbitmq-unavailable.md).
+4. ApiGateway unhealthy: check YARP configuration, not downstream microservices.
 
-## Como validar recuperação
+## How to validate recovery
 
 1. `GET /health/live` → 200 Healthy.
 2. `GET /health/ready` → 200 Healthy.
-3. `docker compose ps` → `healthy` (se healthcheck configurado).
-4. Fluxo de negócio de fumaça: listar produtos, checkout, ou métricas voltando a subir.
+3. `docker compose ps` → `healthy` (if healthcheck configured).
+4. Smoke business flow: list products, checkout, or metrics rising again.

@@ -1,12 +1,12 @@
-# Métricas com Prometheus e Grafana
+# Metrics with Prometheus and Grafana
 
-## Subir a stack
+## Start the stack
 
 ```bash
 docker compose up --build
 ```
 
-Serviços expõem métricas em `GET /metrics` (formato Prometheus via OpenTelemetry).
+Services expose metrics at `GET /metrics` (Prometheus format via OpenTelemetry).
 
 ## Prometheus
 
@@ -14,38 +14,38 @@ Serviços expõem métricas em `GET /metrics` (formato Prometheus via OpenTeleme
 - Config: `infra/prometheus/prometheus.yml`
 - Jobs: `catalog-api`, `basket-api`, `ordering-api`, `inventory-api`, `payment-worker`, `notification-worker`
 
-### Exemplos de consulta
+### Query examples
 
 ```promql
-# Pedidos criados por segundo
+# Orders created per second
 sum(rate(ecommerce_orders_created_total[1m]))
 
-# Outbox pendente por serviço
+# Pending outbox by service
 sum by (service) (ecommerce_outbox_messages_pending)
 
-# Falhas de consumer
+# Consumer failures
 sum by (service, consumer_name) (rate(ecommerce_consumer_messages_failed_total[5m]))
 
-# Publicações de outbox esgotadas
+# Exhausted outbox publications
 sum(rate(ecommerce_outbox_messages_exhausted_total[5m]))
 ```
 
 ## Grafana
 
 - URL: http://localhost:3000
-- Usuário/senha padrão: `admin` / `admin`
-- Dashboard provisionado: **Microservices.Ecommerce** (`infra/grafana/dashboards/microservices-ecommerce.json`)
+- Default user/password: `admin` / `admin`
+- Provisioned dashboard: **Microservices.Ecommerce** (`infra/grafana/dashboards/microservices-ecommerce.json`)
 
-Painéis incluídos:
+Included panels:
 
-- Taxa de pedidos criados / completados / falhos / cancelados
-- Outbox pendente e falhas de publicação
-- Consumers processados vs falhas
-- Reservas de estoque aprovadas vs falhadas
+- Order created / completed / failed / cancelled rate
+- Pending outbox and publish failures
+- Consumers processed vs failures
+- Stock reservations approved vs failed
 
-## Habilitar/desabilitar export Prometheus
+## Enable/disable Prometheus export
 
-`appsettings.json` ou variável de ambiente:
+`appsettings.json` or environment variable:
 
 ```json
 "OpenTelemetry": {
@@ -57,14 +57,14 @@ Painéis incluídos:
 OpenTelemetry__PrometheusEnabled=false
 ```
 
-OTLP continua opcional via `OpenTelemetry:OtlpEndpoint`.
+OTLP remains optional via `OpenTelemetry:OtlpEndpoint`.
 
-## Correlacionar com Seq
+## Correlate with Seq
 
-Use `CorrelationId` e `OrderId` nos logs ([observability-seq.md](./observability-seq.md)) e cruze com picos nas métricas acima.
+Use `CorrelationId` and `OrderId` in logs ([observability-seq.md](./observability-seq.md)) and cross-reference with spikes in the metrics above.
 
-## Limitações (demo local)
+## Limitations (local demo)
 
-- Sem Alertmanager.
-- Scrape estático (sem service discovery).
-- Gauge de outbox reflete consulta ao banco no momento do scrape (atraso de 1–2 ciclos do dispatcher).
+- No Alertmanager.
+- Static scrape (no service discovery).
+- Outbox gauge reflects a database query at scrape time (1–2 dispatcher cycle delay).

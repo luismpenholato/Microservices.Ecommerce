@@ -1,56 +1,56 @@
-# Segurança
+# Security
 
-Visão da autenticação e autorização no **Microservices.Ecommerce** (portfólio / demo local).
+Overview of authentication and authorization in **Microservices.Ecommerce** (portfolio / local demo).
 
 ## IdentityService
 
 | Endpoint | Auth |
 |----------|------|
-| `POST /identity/auth/register` | Público |
-| `POST /identity/auth/login` | Público |
+| `POST /identity/auth/register` | Public |
+| `POST /identity/auth/login` | Public |
 | `GET /identity/auth/me` | JWT |
 
-- Senhas com **BCrypt** (work factor 12); senha **nunca** é logada.
-- JWT emitido com `sub`, `email`, `customer_id`, `role`.
-- Configuração: `Jwt:Secret`, `Issuer`, `Audience`, `ExpirationMinutes` (variáveis de ambiente no Docker).
+- Passwords with **BCrypt** (work factor 12); password is **never** logged.
+- JWT issued with `sub`, `email`, `customer_id`, `role`.
+- Configuration: `Jwt:Secret`, `Issuer`, `Audience`, `ExpirationMinutes` (environment variables in Docker).
 
-## ApiGateway (borda)
+## ApiGateway (edge)
 
-`GatewayAuthorizationMiddleware` após validação JWT:
+`GatewayAuthorizationMiddleware` after JWT validation:
 
-| Rota | Política |
-|------|----------|
-| `/identity/*` (register/login) | Público |
-| `GET /catalog/products*` | Público |
-| `POST/PUT /catalog/*` | JWT + role **Admin** |
-| `/basket/*`, `/ordering/*` | JWT obrigatório |
-| `/inventory/*` | Público (demo) |
+| Route | Policy |
+|-------|--------|
+| `/identity/*` (register/login) | Public |
+| `GET /catalog/products*` | Public |
+| `POST/PUT /catalog/*` | JWT + **Admin** role |
+| `/basket/*`, `/ordering/*` | JWT required |
+| `/inventory/*` | Public (demo) |
 
-## Serviços (defesa em profundidade)
+## Services (defense in depth)
 
-- **Basket** e **Ordering**: `[Authorize]` + validação `customerId` da URL contra claim `customer_id` (403 se divergir).
-- **Ordering** `POST /orders`: `customerId` vem **apenas** do token; body não define cliente.
-- **Basket → Ordering**: `BearerTokenForwardingHandler` repassa o JWT no checkout.
-- **Catalog**: leitura anônima; escrita exige Admin.
+- **Basket** and **Ordering**: `[Authorize]` + validate URL `customerId` against `customer_id` claim (403 if mismatch).
+- **Ordering** `POST /orders`: `customerId` comes **only** from the token; body does not define the customer.
+- **Basket → Ordering**: `BearerTokenForwardingHandler` forwards JWT on checkout.
+- **Catalog**: anonymous read; write requires Admin.
 
-## Credenciais demo (seed)
+## Demo credentials (seed)
 
-| Perfil | E-mail | Senha | Role |
-|--------|--------|-------|------|
-| Cliente | `demo@ecommerce.local` | `Demo123!` | Customer |
+| Profile | Email | Password | Role |
+|---------|-------|----------|------|
+| Customer | `demo@ecommerce.local` | `Demo123!` | Customer |
 | Admin | `admin@ecommerce.local` | `Admin123!` | Admin |
 
-> Use apenas em ambiente local. Não reutilize em produção.
+> Use only in local environment. Do not reuse in production.
 
-## Segredos
+## Secrets
 
-- `Jwt:Secret` mínimo 32 caracteres — via `appsettings`, `appsettings.Docker.json` ou `Jwt__Secret` no Compose (demo).
-- Não commitar `.env` com segredos reais (ver [.gitignore](../.gitignore)).
+- `Jwt:Secret` minimum 32 characters — via `appsettings`, `appsettings.Docker.json`, or `Jwt__Secret` in Compose (demo).
+- Do not commit `.env` with real secrets (see [.gitignore](../.gitignore)).
 
-## Limitações intencionais (demo)
+## Intentional limitations (demo)
 
-- Sem refresh token, OAuth ou IdentityServer.
-- JWT simétrico (HMAC) compartilhado entre serviços.
-- Inventory público para facilitar smoke tests.
+- No refresh token, OAuth, or IdentityServer.
+- Shared symmetric JWT (HMAC) across services.
+- Inventory is public to simplify smoke tests.
 
-Evoluções planejadas: [ROADMAP.md](../ROADMAP.md).
+Planned evolutions: [ROADMAP.md](../ROADMAP.md).

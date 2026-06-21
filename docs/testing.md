@@ -1,74 +1,69 @@
-# Testes
+# Testing
 
-Estratégia de testes do repositório.
+Test strategy for this repository.
 
-## Visão geral
+## Overview
 
-| Camada | Projeto | Ferramentas | Docker |
-|--------|---------|-------------|--------|
-| Unitário | `Catalog.UnitTests`, `Basket.UnitTests`, `Ordering.UnitTests` | xUnit, FluentAssertions, Moq | Não |
-| Integração | `IntegrationTests` | WebApplicationFactory, Testcontainers | **Sim** |
-| Segurança | `Security.IntegrationTests` | WebApplicationFactory, Testcontainers | **Sim** |
+| Layer | Project | Tools | Docker |
+|-------|---------|-------|--------|
+| Unit | `Catalog.UnitTests`, `Basket.UnitTests`, `Ordering.UnitTests` | xUnit, FluentAssertions, Moq | No |
+| Integration | `IntegrationTests` | WebApplicationFactory, Testcontainers | **Yes** |
+| Security | `Security.IntegrationTests` | WebApplicationFactory, Testcontainers | **Yes** |
 
 ## CI (GitHub Actions)
 
 Workflow [`.github/workflows/ci.yml`](../.github/workflows/ci.yml):
 
-1. **build** — `dotnet build` + testes unitários (`*UnitTests`)
-2. **integration** — testes `IntegrationTests` + `Security.IntegrationTests` (runner com Docker)
+1. **build** — `dotnet build`
+2. **unit-tests** — `Catalog.UnitTests`, `Basket.UnitTests`, `Ordering.UnitTests`
 
-## Executar localmente
+Integration and security tests are **not** executed in CI. They require Docker (Testcontainers) and are intended for local validation only.
+
+## Run locally
 
 ```bash
-# Todos (requer Docker para integração/segurança)
+# All (requires Docker for integration/security)
 dotnet test
 
-# Apenas unitários
+# Unit tests only
 dotnet test tests/Catalog.UnitTests tests/Basket.UnitTests tests/Ordering.UnitTests
 
-# Integração + segurança
+# Integration + security
 dotnet test tests/IntegrationTests tests/Security.IntegrationTests
 ```
 
-## O que cada suite cobre
+## What each suite covers
 
-### Unitários
+### Unit tests
 
-- Regras de domínio e validações (FluentValidation) isoladas.
+- Domain rules and validations (FluentValidation) in isolation.
 
-### Integração (`IntegrationTests`)
+### Integration (`IntegrationTests`)
 
-- Outbox + idempotência no Ordering
-- Resiliência do `OutboxDispatcher` (falha transitória de publish)
-- Consumer com falha simulada + retry MassTransit
-- Concorrência de estoque (dois pedidos, estoque 1)
-- Checkout Basket → Ordering (com JWT)
+- Outbox + idempotency in Ordering
+- `OutboxDispatcher` resilience (transient publish failure)
+- Consumer with simulated failure + MassTransit retry
+- Stock concurrency (two orders, stock of 1)
+- Basket → Ordering checkout (with JWT)
 
-### Segurança (`Security.IntegrationTests`)
+### Security (`Security.IntegrationTests`)
 
-- Register / login / login inválido
-- Basket sem token → 401; token válido → 200; `customerId` divergente → 403
-- Gateway: basket protegido; catalog GET público
+- Register / login / invalid login
+- Basket without token → 401; valid token → 200; mismatched `customerId` → 403
+- Gateway: basket protected; catalog GET public
 
-## Validação operacional (manual / script)
+## Operational validation (manual)
 
-Não substitui testes automatizados, mas valida o stack completo:
+Does not replace automated tests, but validates the full stack. Follow [smoke-tests.md](./smoke-tests.md) after `docker compose up`.
 
-```powershell
-.\scripts\validate-local.ps1
-.\scripts\validate-local.ps1 -RunCheckoutFlow
-```
+## Recommended manual tests
 
-Ver [smoke-tests.md](./smoke-tests.md) e [operations.md](./operations.md).
-
-## Testes manuais recomendados
-
-- `docker compose up` + fluxo em [smoke-tests.md](./smoke-tests.md)
-- Dashboards Grafana / Seq após checkout
-- RabbitMQ UI — filas `_error` vazias em fluxo feliz
-- Runbooks em [runbooks/](./runbooks/) em cenários de falha simulada
+- `docker compose up` + flow in [smoke-tests.md](./smoke-tests.md)
+- Grafana / Seq dashboards after checkout
+- RabbitMQ UI — `_error` queues empty on happy path
+- Runbooks in [runbooks/](./runbooks/) for simulated failure scenarios
 
 ## Helpers
 
-- `tests/IntegrationTests/Infrastructure/IntegrationTestAuthHelper.cs` — JWT para testes de Ordering/Basket
-- `tests/Security.IntegrationTests/Infrastructure/TestJwtTokenFactory.cs` — JWT para testes de segurança
+- `tests/IntegrationTests/Infrastructure/IntegrationTestAuthHelper.cs` — JWT for Ordering/Basket tests
+- `tests/Security.IntegrationTests/Infrastructure/TestJwtTokenFactory.cs` — JWT for security tests

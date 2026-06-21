@@ -1,47 +1,30 @@
-# Smoke tests — ambiente local
+# Smoke tests — local environment
 
-Roteiro manual para validar o stack após clonar o repositório. Para checagens automatizadas de infraestrutura, use os scripts em [scripts/](../scripts/).
+Manual checklist to validate the stack after cloning the repository.
 
-## Pré-requisitos
+## Prerequisites
 
-- Docker Desktop (ou Docker Engine + Compose v2)
-- Portas livres: `5000`–`5004`, `5010`–`5011`, `5432`, `6379`, `5672`, `15672`, `5341`, `9090`, `3000`
-- (Opcional) `curl` ou PowerShell para chamadas HTTP manuais
+- Docker Desktop (or Docker Engine + Compose v2)
+- Free ports: `5000`–`5004`, `5010`–`5011`, `5432`, `6379`, `5672`, `15672`, `5341`, `9090`, `3000`
+- `curl` or PowerShell for HTTP calls
 
-## 1. Subir o ambiente
+## 1. Start the environment
 
 ```bash
 docker compose up -d --build
 ```
 
-Ou validação automatizada:
+Wait for all healthchecks to become `healthy` (`docker compose ps`).
 
-```powershell
-# Infraestrutura + health + metrics + rotas básicas
-.\scripts\validate-local.ps1
-
-# Inclui checkout ponta a ponta + idempotência HTTP no Ordering
-.\scripts\validate-local.ps1 -RunCheckoutFlow
-```
+Quick sanity checks:
 
 ```bash
-chmod +x scripts/validate-local.sh
-./scripts/validate-local.sh
-./scripts/validate-local.sh --run-checkout-flow
+curl -s http://localhost:5000/health/ready
+curl -s http://localhost:5000/catalog/products
+curl -s http://localhost:5000/metrics | head
 ```
 
-O modo E2E do script:
-
-1. Obtém o primeiro produto do Catalog via Gateway
-2. Valida estoque no Inventory
-3. Adiciona item ao Basket e faz checkout
-4. Poll em `GET /ordering/orders/{orderId}` a cada 3s (padrão: timeout 120s)
-5. Exige status final `Completed` (até 3 tentativas se pagamento simulado rejeitar)
-6. Repete `POST /ordering/orders` com a mesma `Idempotency-Key` e compara `id`
-
-Aguarde todos os healthchecks ficarem `healthy` (`docker compose ps`).
-
-## 2. Autenticar
+## 2. Authenticate
 
 ```bash
 curl -s -X POST http://localhost:5000/identity/auth/login \
@@ -49,9 +32,9 @@ curl -s -X POST http://localhost:5000/identity/auth/login \
   -d '{"email":"demo@ecommerce.local","password":"Demo123!"}'
 ```
 
-Guarde `accessToken` e `customerId` para os passos de Basket/Ordering.
+Save `accessToken` and `customerId` for Basket/Ordering steps.
 
-## 3. Consultar catálogo
+## 3. Query catalog
 
 Via Gateway:
 
@@ -59,23 +42,23 @@ Via Gateway:
 curl -s http://localhost:5000/catalog/products
 ```
 
-Esperado: lista JSON com produtos seed (ex.: `Notebook Pro`, id `11111111-1111-1111-1111-111111111101`).
+Expected: JSON list with seed products (e.g. `Notebook Pro`, id `11111111-1111-1111-1111-111111111101`).
 
-## 4. Consultar estoque
+## 4. Query stock
 
 ```bash
 curl -s http://localhost:5000/inventory/inventory/11111111-1111-1111-1111-111111111101
 ```
 
-Esperado: `availableQuantity` > 0 (seed do Inventory).
+Expected: `availableQuantity` > 0 (Inventory seed).
 
-## 4. Carrinho e checkout
+## 4. Cart and checkout
 
-Defina um `customerId` (GUID qualquer):
+Set a `customerId` (any GUID):
 
 ```bash
-CUSTOMER_ID="<customerId do login>"
-TOKEN="<accessToken do login>"
+CUSTOMER_ID="<customerId from login>"
+TOKEN="<accessToken from login>"
 PRODUCT_ID=11111111-1111-1111-1111-111111111101
 
 curl -s -X POST "http://localhost:5000/basket/baskets/$CUSTOMER_ID/items" \
@@ -87,73 +70,64 @@ curl -s -X POST "http://localhost:5000/basket/baskets/$CUSTOMER_ID/checkout" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-Esperado no checkout: JSON com `orderId`. O Basket gera o header `Idempotency-Key` automaticamente para o Ordering.
+Expected on checkout: JSON with `orderId`. Basket generates the `Idempotency-Key` header automatically for Ordering.
 
-## 6. Acompanhar pedido
+## 6. Track order
 
 ```bash
-# substitua ORDER_ID pelo retorno do checkout
+# replace ORDER_ID with checkout response
 curl -s http://localhost:5000/ordering/orders/ORDER_ID \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-Fluxo assíncrono esperado (alguns segundos):
+Expected async flow (a few seconds):
 
-1. `Pending` → após pagamento simulado
-2. `PaymentApproved` / processamento de estoque
-3. `Completed` (ou `Failed` / `Cancelled` em cenários de falha)
+1. `Pending` → after simulated payment
+2. `PaymentApproved` / stock processing
+3. `Completed` (or `Failed` / `Cancelled` in failure scenarios)
 
-## 6. Logs no Seq
+## 6. Logs in Seq
 
-1. Abra http://localhost:5341
-2. Filtros úteis:
-   - `Service = 'OrderingService'` e `OrderId` do checkout
-   - `ConsumerName` em workers (`PaymentService`, `InventoryService`, …)
-   - `@Level = 'Error'` para falhas de consumer
+1. Open http://localhost:5341
+2. Useful filters:
+   - `Service = 'OrderingService'` and checkout `OrderId`
+   - `ConsumerName` in workers (`PaymentService`, `InventoryService`, …)
+   - `@Level = 'Error'` for consumer failures
 
-Guia detalhado: [observability-seq.md](./observability-seq.md)
+Detailed guide: [observability-seq.md](./observability-seq.md)
 
-## 7. Métricas no Prometheus e Grafana
+## 7. Metrics in Prometheus and Grafana
 
-1. Prometheus: http://localhost:9090 — targets `up` para APIs e workers
-2. Grafana: http://localhost:3000 (admin/admin) — dashboard **Microservices Ecommerce**
+1. Prometheus: http://localhost:9090 — targets `up` for APIs and workers
+2. Grafana: http://localhost:3000 (admin/admin) — **Microservices Ecommerce** dashboard
 
-Métricas a observar após checkout:
+Metrics to observe after checkout:
 
-| Métrica | O que indica |
-|---------|----------------|
-| `ecommerce_orders_created_total` | Pedido criado |
-| `ecommerce_orders_completed_total` | Fluxo concluído |
-| `ecommerce_consumer_messages_processed_total` | Consumers processando eventos |
-| `ecommerce_outbox_messages_pending` | Fila de outbox (deve voltar a ~0) |
+| Metric | What it indicates |
+|--------|-------------------|
+| `ecommerce_orders_created_total` | Order created |
+| `ecommerce_orders_completed_total` | Flow completed |
+| `ecommerce_consumer_messages_processed_total` | Consumers processing events |
+| `ecommerce_outbox_messages_pending` | Outbox queue (should return to ~0) |
 
-Guia: [observability-prometheus.md](./observability-prometheus.md)
+Guide: [observability-prometheus.md](./observability-prometheus.md)
 
-## 8. RabbitMQ (opcional)
+## 8. RabbitMQ (optional)
 
 - UI: http://localhost:15672 (guest/guest)
-- Verifique filas dos endpoints após checkout; filas `*_error` devem permanecer vazias em fluxo feliz.
+- Check endpoint queues after checkout; `*_error` queues should remain empty on happy path.
 
-## Validação automatizada E2E
+## Success criteria
 
-```powershell
-.\scripts\validate-local.ps1 -SkipCompose -RunCheckoutFlow
-```
+- [ ] All Compose services report `healthy` in `docker compose ps`
+- [ ] Checkout returns `orderId`
+- [ ] Order progresses to `Completed` in Ordering
+- [ ] Seq shows transition logs without unexpected `Error`
+- [ ] Grafana/Prometheus show increment in `ecommerce_*` metrics
 
-Variável de ambiente (Bash): `CHECKOUT_POLL_TIMEOUT_SECONDS=180`
+## If something fails
 
-## Critérios de sucesso
-
-- [ ] `validate-local.ps1` ou `.sh` termina com sucesso
-- [ ] Com `-RunCheckoutFlow` / `--run-checkout-flow`: pedido em `Completed` e idempotência OK
-- [ ] Checkout retorna `orderId`
-- [ ] Pedido evolui para `Completed` no Ordering
-- [ ] Seq mostra logs de transição sem `Error` inesperado
-- [ ] Grafana/Prometheus exibem incremento nas métricas `ecommerce_*`
-
-## Se algo falhar
-
-Consulte os [runbooks](./runbooks/):
+See the [runbooks](./runbooks/):
 
 - [service-unhealthy.md](./runbooks/service-unhealthy.md)
 - [outbox-messages-stuck.md](./runbooks/outbox-messages-stuck.md)

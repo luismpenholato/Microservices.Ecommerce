@@ -1,14 +1,14 @@
-# Runbook: mensagens presas no outbox
+# Runbook: messages stuck in outbox
 
-## Sintoma
+## Symptom
 
-- Pedido criado, mas `OrderCreatedEvent` (ou outro evento) não aparece no RabbitMQ.
-- Downstream (Payment, Inventory) não reage.
-- Logs do `OutboxDispatcher` com falhas de publicação ou silêncio prolongado.
+- Order created, but `OrderCreatedEvent` (or other event) does not appear in RabbitMQ.
+- Downstream (Payment, Inventory) does not react.
+- `OutboxDispatcher` logs with publish failures or prolonged silence.
 
-## Como identificar
+## How to identify
 
-### Banco do serviço publicador
+### Publishing service database
 
 ```sql
 SELECT id, event_id, event_type, retry_count, last_error, created_at_utc, processed_at_utc
@@ -17,16 +17,16 @@ WHERE processed_at_utc IS NULL
 ORDER BY created_at_utc;
 ```
 
-| Situação | Significado |
-|----------|-------------|
-| `processed_at_utc IS NULL` e `retry_count < MaxPublishRetries` | Pendente, ainda em retry |
-| `retry_count >= MaxPublishRetries` | Retries de publicação **esgotados** |
-| `last_error` preenchido | Última falha do broker/serialização |
+| Situation | Meaning |
+|-----------|---------|
+| `processed_at_utc IS NULL` and `retry_count < MaxPublishRetries` | Pending, still retrying |
+| `retry_count >= MaxPublishRetries` | Publish retries **exhausted** |
+| `last_error` populated | Last broker/serialization failure |
 
 ### Prometheus
 
-- `ecommerce_outbox_messages_pending{service="OrderingService"}` > 0 por tempo prolongado.
-- `ecommerce_outbox_messages_exhausted_total` aumentando.
+- `ecommerce_outbox_messages_pending{service="OrderingService"}` > 0 for extended time.
+- `ecommerce_outbox_messages_exhausted_total` increasing.
 
 ### Logs (Seq)
 
@@ -34,33 +34,33 @@ ORDER BY created_at_utc;
 @Message like '%outbox publish failed%' or @Message like '%outbox publish exhausted%'
 ```
 
-## Impacto
+## Impact
 
-- Eventos **não** chegam ao broker; fluxo assíncrono para após o ponto do outbox.
-- HTTP/checkout pode ter sucesso enquanto o processo assíncrono está parado.
+- Events **do not** reach the broker; async flow stops at the outbox point.
+- HTTP/checkout may succeed while the async process is stalled.
 
-## Ação recomendada
+## Recommended action
 
-1. Verifique **RabbitMQ** ([runbook rabbitmq](./rabbitmq-unavailable.md)).
-2. Verifique **PostgreSQL** do serviço ([runbook database](./database-unavailable.md)).
-3. Leia `last_error` na linha do outbox.
-4. Após corrigir broker/rede:
-   - O `OutboxDispatcher` deve publicar na próxima iteração (`Outbox:PollIntervalSeconds`).
-   - Não é necessário alterar a linha se `retry_count` ainda permitir retry.
-5. Se retries esgotados:
-   - Corrija a causa.
-   - Opcional (operação manual avançada): reset controlado de `retry_count` e `last_error` **apenas** após garantir que o evento não foi publicado (sem duplicar no broker — `EventId` único no outbox ajuda).
+1. Check **RabbitMQ** ([rabbitmq runbook](./rabbitmq-unavailable.md)).
+2. Check service **PostgreSQL** ([database runbook](./database-unavailable.md)).
+3. Read `last_error` on the outbox row.
+4. After fixing broker/network:
+   - `OutboxDispatcher` should publish on the next iteration (`Outbox:PollIntervalSeconds`).
+   - No row change needed if `retry_count` still allows retry.
+5. If retries exhausted:
+   - Fix the cause.
+   - Optional (advanced manual operation): controlled reset of `retry_count` and `last_error` **only** after confirming the event was not published (avoid broker duplication — unique `EventId` in outbox helps).
 
-## Como validar recuperação
+## How to validate recovery
 
-1. `processed_at_utc` preenchido na linha do outbox.
-2. Log: `outbox message published` com `EventId` correspondente.
-3. `ecommerce_outbox_messages_pending` diminui.
-4. Consumer downstream processa (ver logs/métricas).
+1. `processed_at_utc` populated on the outbox row.
+2. Log: `outbox message published` with matching `EventId`.
+3. `ecommerce_outbox_messages_pending` decreases.
+4. Downstream consumer processes (see logs/metrics).
 
-## Configuração relacionada
+## Related configuration
 
-| Seção | Chave | Padrão local |
-|-------|-------|----------------|
+| Section | Key | Local default |
+|---------|-----|---------------|
 | `Outbox` | `MaxPublishRetries` | 5 |
 | `Outbox` | `PollIntervalSeconds` | 2 |

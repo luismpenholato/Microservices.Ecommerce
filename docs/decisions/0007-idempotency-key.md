@@ -1,21 +1,21 @@
-# ADR 0007: Idempotency-Key no checkout
+# ADR 0007: Idempotency-Key on checkout
 
 ## Status
 
-Aceito
+Accepted
 
-## Contexto
+## Context
 
-Retries HTTP no checkout podem criar pedidos duplicados.
+HTTP retries on checkout can create duplicate orders.
 
-## Decisão
+## Decision
 
-Basket gera `Idempotency-Key` determinística por conteúdo do carrinho e Ordering persiste `order_idempotency_records`.
+Basket generates a deterministic `Idempotency-Key` from cart content and Ordering persists `order_idempotency_records`.
 
-- Mesma chave + mesmo payload → retorna o mesmo `OrderId`
-- Mesma chave + payload diferente → HTTP 409 Conflict
+- Same key + same payload → returns the same `OrderId`
+- Same key + different payload → HTTP 409 Conflict
 
-## Consequências
+## Consequences
 
-- Checkout seguro para retry
-- Necessidade de armazenar hash do payload por chave
+- Safe checkout for retry
+- Need to store payload hash per key

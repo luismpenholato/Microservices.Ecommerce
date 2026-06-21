@@ -1,13 +1,13 @@
-# ADR 0005: Consistência eventual
+# ADR 0005: Eventual consistency
 
 ## Status
 
-Aceito
+Accepted
 
-## Decisão
+## Decision
 
-Status do pedido atualizado por eventos (`PaymentApproved`, `StockReserved`, etc.).
+Order status updated by events (`PaymentApproved`, `StockReserved`, etc.).
 
 ## Trade-off
 
-Latência entre estados aceitável em troca de desacoplamento e resiliência.
+Latency between states acceptable in exchange for decoupling and resilience.
