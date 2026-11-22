@@ -3,18 +3,35 @@
 [![CI](https://github.com/luismpenholato/Microservices.Ecommerce/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/luismpenholato/Microservices.Ecommerce/actions/workflows/ci.yml)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-luismpenholato-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/luismpenholato)
 
 A .NET e-commerce **study / portfolio reference** covering authentication, catalog, basket, checkout and asynchronous order fulfillment. Run the APIs, workers and observability stack locally with Docker Compose.
 
 **Stack:** .NET 10 · YARP · RabbitMQ / MassTransit · PostgreSQL · Redis · JWT · Serilog / Seq · Prometheus / Grafana.
 
-Related references: [EventDriven.OrderProcessing.RabbitMQ](https://github.com/luismpenholato/EventDriven.OrderProcessing.RabbitMQ) · [EventStreaming.Analytics.Kafka](https://github.com/luismpenholato/EventStreaming.Analytics.Kafka)
-
-[Quick start](#running-with-docker-compose) · [Checkout flow](#checkout-flow) · [Architecture](#architecture-overview) · [Tests](#testing-strategy) · [Trade-offs](#conscious-trade-offs)
+[Quick start](#running-with-docker-compose) · [What you'll learn](#what-youll-learn) · [Portfolio series](#portfolio-series) · [Architecture](#architecture-overview) · [Tests](#testing-strategy) · [Trade-offs](#conscious-trade-offs)
 
 ## Purpose
 
 This repository is a **portfolio / open-source reference project**, not a turnkey commercial platform. Payments and notifications are simulated; the database, broker and cache run as real local services. Use it to explore service ownership, eventual consistency and failure handling before adapting the design to another system.
+
+## What you'll learn
+
+- Service boundaries behind a YARP API gateway
+- Basket/checkout orchestration with eventual consistency
+- Outbox-style messaging with MassTransit + RabbitMQ
+- JWT auth across services for a demo catalog
+- Local observability with Seq, Prometheus and Grafana
+
+## Portfolio series
+
+| Repository | Focus |
+| ---------- | ----- |
+| **This repo** | Microservices e-commerce + gateway + observability |
+| [EventDriven.OrderProcessing.RabbitMQ](https://github.com/luismpenholato/EventDriven.OrderProcessing.RabbitMQ) | Order flow with RabbitMQ / MassTransit workers |
+| [EventStreaming.Analytics.Kafka](https://github.com/luismpenholato/EventStreaming.Analytics.Kafka) | Kafka analytics pipeline + CQRS read models |
+| [orderflow-operations](https://github.com/luismpenholato/orderflow-operations) | Node/React modular monolith (inventory + ERP outbox) |
+| [clean-stack](https://github.com/luismpenholato/clean-stack) | Full-stack starter (.NET 10 + Angular / React) |
 
 ## Architecture overview
 
@@ -271,6 +288,15 @@ Integration and security tests are **not** run in CI (require Docker locally). R
 
 Implemented features are documented above. Planned items (refresh tokens, asymmetric JWT, Alertmanager, contract tests, Kubernetes/Aspire, and more) are tracked in [ROADMAP.md](ROADMAP.md).
 
+## Community
+
+- [Contributing](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security Policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
+
 ## License
 
 [MIT](LICENSE) — Copyright (c) 2026 Luis Penholato
+
+Optional support for open-source maintenance: [GitHub Sponsors](https://github.com/sponsors/luismpenholato).
