@@ -1,12 +1,12 @@
 using BuildingBlocks.Messaging;
 using BuildingBlocks.Messaging.Metrics;
-using Inventory.Infrastructure.Persistence;
-using Inventory.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Inventory.Infrastructure.Persistence;
+using Inventory.Infrastructure.Persistence.Entities;
 
 namespace Inventory.Infrastructure.Outbox;
 
@@ -56,14 +56,18 @@ public sealed class OutboxDispatcher(
         var maxRetries = options.Value.MaxPublishRetries;
         var batchSize = options.Value.BatchSize;
 
-        var entities = await dbContext.OutboxMessages
-            .Where(x => x.ProcessedAtUtc == null && x.RetryCount < maxRetries)
-            .OrderBy(x => x.CreatedAtUtc)
-            .Take(batchSize)
-            .ToListAsync(cancellationToken);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        var entities = await OutboxClaim.ClaimPendingAsync(
+            dbContext.OutboxMessages,
+            "outbox_messages",
+            maxRetries,
+            batchSize,
+            cancellationToken);
 
         if (entities.Count == 0)
         {
+            await transaction.CommitAsync(cancellationToken);
             return;
         }
 
@@ -90,6 +94,8 @@ public sealed class OutboxDispatcher(
                 await dbContext.SaveChangesAsync(ct);
             },
             cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
     }
 
     private static OutboxDispatchLoop.OutboxMessageSnapshot Map(OutboxMessage message) => new()
