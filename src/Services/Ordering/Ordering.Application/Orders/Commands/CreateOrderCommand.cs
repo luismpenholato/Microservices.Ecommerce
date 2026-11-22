@@ -68,7 +68,14 @@ public sealed class CreateOrderCommandHandler(
                     x.ProductId, x.ProductName, x.Quantity, x.UnitPrice)).ToList()
         });
 
-        await repository.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await repository.SaveChangesAsync(cancellationToken);
+        }
+        catch (IdempotencyRaceException)
+        {
+            return await RecoverFromIdempotencyRaceAsync(request, requestHash, cancellationToken);
+        }
 
         orderMetrics.RecordOrderCreated();
 
@@ -79,5 +86,29 @@ public sealed class CreateOrderCommandHandler(
             request.IdempotencyKey);
 
         return OrderMapper.ToDto(order);
+    }
+
+    private async Task<OrderDto> RecoverFromIdempotencyRaceAsync(
+        CreateOrderCommand request,
+        string requestHash,
+        CancellationToken cancellationToken)
+    {
+        var racedRecord = await repository.GetIdempotencyRecordAsync(request.IdempotencyKey, cancellationToken);
+        if (racedRecord is null)
+            throw new IdempotencyRaceException(request.IdempotencyKey);
+
+        if (!string.Equals(racedRecord.RequestHash, requestHash, StringComparison.Ordinal))
+            throw new IdempotencyConflictException(request.IdempotencyKey);
+
+        var existingOrder = await repository.GetByIdAsync(racedRecord.OrderId, cancellationToken);
+        if (existingOrder is null)
+            throw new IdempotencyRaceException(request.IdempotencyKey);
+
+        logger.LogInformation(
+            "Recovered concurrent create for order {OrderId} with idempotency key {IdempotencyKey}",
+            existingOrder.Id,
+            request.IdempotencyKey);
+
+        return OrderMapper.ToDto(existingOrder);
     }
 }

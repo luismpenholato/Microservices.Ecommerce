@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Ordering.Application.Abstractions;
+using Ordering.Application.Exceptions;
 using IdempotencyRecord = Ordering.Application.Abstractions.IdempotencyRecord;
 using Ordering.Domain.Entities;
 using Ordering.Infrastructure.Persistence.Entities;
@@ -61,6 +63,38 @@ public sealed class OrderRepository(OrderingDbContext dbContext) : IOrderReposit
         return Task.CompletedTask;
     }
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken) =>
-        dbContext.SaveChangesAsync(cancellationToken);
+    public async Task SaveChangesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsIdempotencyUniqueViolation(ex))
+        {
+            var key = ExtractIdempotencyKey(ex) ?? "unknown";
+            throw new IdempotencyRaceException(key);
+        }
+    }
+
+    private static bool IsIdempotencyUniqueViolation(DbUpdateException ex)
+    {
+        if (ex.InnerException is not PostgresException postgres)
+            return false;
+
+        // 23505 = unique_violation
+        return postgres.SqlState == "23505"
+            && (postgres.ConstraintName?.Contains("idempotency", StringComparison.OrdinalIgnoreCase) == true
+                || postgres.MessageText.Contains("order_idempotency", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string? ExtractIdempotencyKey(DbUpdateException ex)
+    {
+        foreach (var entry in ex.Entries)
+        {
+            if (entry.Entity is OrderIdempotencyRecord record)
+                return record.IdempotencyKey;
+        }
+
+        return null;
+    }
 }
