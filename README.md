@@ -4,9 +4,11 @@
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A .NET e-commerce reference platform covering authentication, catalog, basket, checkout and asynchronous order fulfillment. Run the APIs, workers and observability stack locally with Docker Compose.
+A .NET e-commerce **study / portfolio reference** covering authentication, catalog, basket, checkout and asynchronous order fulfillment. Run the APIs, workers and observability stack locally with Docker Compose.
 
 **Stack:** .NET 10 · YARP · RabbitMQ / MassTransit · PostgreSQL · Redis · JWT · Serilog / Seq · Prometheus / Grafana.
+
+Related references: [EventDriven.OrderProcessing.RabbitMQ](https://github.com/luismpenholato/EventDriven.OrderProcessing.RabbitMQ) · [EventStreaming.Analytics.Kafka](https://github.com/luismpenholato/EventStreaming.Analytics.Kafka)
 
 [Quick start](#running-with-docker-compose) · [Checkout flow](#checkout-flow) · [Architecture](#architecture-overview) · [Tests](#testing-strategy) · [Trade-offs](#conscious-trade-offs)
 
